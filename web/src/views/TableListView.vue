@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref, watch } from 'vue'
+import { h, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   NButton,
@@ -14,7 +14,6 @@ import type { DropdownOption, FormInst, FormRules } from 'naive-ui'
 
 import AppSidebar from '@/components/AppSidebar.vue'
 import { ApiError } from '@/api/http'
-import { useAuthStore } from '@/stores/auth'
 import { useSpecTableStore } from '@/stores/specTable'
 import type { TableSummary } from '@/types/api'
 import { formatRelativeTime } from '@/utils/time'
@@ -23,13 +22,7 @@ const router = useRouter()
 const route = useRoute()
 const message = useMessage()
 const dialog = useDialog()
-const auth = useAuthStore()
 const spec = useSpecTableStore()
-
-const greeting = computed(() => {
-  const name = auth.user?.name || auth.user?.email || ''
-  return name ? `${name}，欢迎回来` : '欢迎回来'
-})
 
 onMounted(() => {
   void spec.loadTables().catch((err) => message.error(describe(err)))
@@ -196,7 +189,13 @@ function describe(err: unknown) {
 
     <main class="main">
       <header class="topbar">
-        <h2>我的参数表</h2>
+        <div class="topbar-title">
+          <button type="button" class="back-btn" title="返回首页" @click="router.push({ name: 'home' })">
+            <i class="ri-arrow-left-line" />
+          </button>
+          <h2>我的参数表</h2>
+          <span v-if="spec.tables.length > 0" class="title-count">{{ spec.tables.length }}</span>
+        </div>
         <n-button size="small" type="primary" @click="openCreate">
           <template #icon><i class="ri-add-line" /></template>
           新建参数表
@@ -209,11 +208,8 @@ function describe(err: unknown) {
           <div class="empty-mark">
             <i class="ri-file-list-3-line" />
           </div>
-          <h3>{{ greeting }}</h3>
-          <p>
-            每张参数表对应一个产品。<br />
-            你可以手工维护参数，也可以直接让 AI 帮你建表、改值和调整分组。
-          </p>
+          <h3>还没有参数表</h3>
+          <p>每张参数表对应一个产品。<br />建好之后可以直接让 AI 帮你填充参数。</p>
           <n-button type="primary" @click="openCreate">
             <template #icon><i class="ri-add-line" /></template>
             新建第一张参数表
@@ -319,10 +315,43 @@ function describe(err: unknown) {
   background: var(--ds-surface);
 }
 
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.back-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.back-btn:hover {
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+}
+
 .topbar h2 {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+}
+
+.title-count {
+  padding: 1px 8px;
+  border-radius: 20px;
+  background: var(--ds-surface-muted);
+  color: var(--ds-text-tertiary);
+  font-size: 11.5px;
 }
 
 .content {

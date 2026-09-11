@@ -55,7 +55,8 @@ async function submit() {
       message.success('登录成功')
     }
 
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/tables'
+    // 没有指定去向时回首页（欢迎页），而不是直接摊开参数表列表
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     await router.replace(redirect)
   } catch (err) {
     message.error(err instanceof ApiError ? err.message : '操作失败，请稍后重试')

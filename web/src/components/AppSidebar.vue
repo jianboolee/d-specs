@@ -66,7 +66,7 @@ onMounted(() => {
   <aside class="sidebar">
     <div class="sidebar-head">
       <div class="brand-mark">配</div>
-      <button class="brand-name" type="button" @click="router.push({ name: 'tables' })">
+      <button class="brand-name" type="button" title="返回首页" @click="router.push({ name: 'home' })">
         参数配置表
       </button>
     </div>

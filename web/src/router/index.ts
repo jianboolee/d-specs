@@ -6,7 +6,12 @@ import { pinia } from '@/stores'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/tables' },
+    {
+      // 首页固定是欢迎页，不再直接铺开参数表卡片
+      path: '/',
+      name: 'home',
+      component: () => import('@/views/HomeView.vue'),
+    },
     {
       path: '/login',
       name: 'login',
