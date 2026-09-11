@@ -136,6 +136,8 @@ type SessionView struct {
 	Title     string    `json:"title"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	// MessageCount 会话内的消息条数，供前端切换器展示
+	MessageCount int `json:"message_count"`
 }
 
 type MessageView struct {

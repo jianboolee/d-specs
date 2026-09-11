@@ -219,6 +219,8 @@ export interface ChatSession {
   title: string
   created_at: string
   updated_at: string
+  /** 会话内的消息条数 */
+  message_count: number
 }
 
 export interface ChatMessageRecord {

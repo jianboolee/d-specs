@@ -279,11 +279,12 @@ func (s *Service) Sessions(ctx context.Context, userID, tableID string) ([]Sessi
 	out := make([]SessionView, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, SessionView{
-			ID:        r.ID,
-			TableID:   r.TableID,
-			Title:     r.Title,
-			CreatedAt: r.CreatedAt,
-			UpdatedAt: r.UpdatedAt,
+			ID:           r.ID,
+			TableID:      r.TableID,
+			Title:        r.Title,
+			CreatedAt:    r.CreatedAt,
+			UpdatedAt:    r.UpdatedAt,
+			MessageCount: r.MessageCount,
 		})
 	}
 	return out, nil

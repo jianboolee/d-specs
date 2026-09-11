@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, useDialog, useMessage } from 'naive-ui'
+import { NButton, NPopover, useDialog, useMessage } from 'naive-ui'
 
 import AppSidebar from '@/components/AppSidebar.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
@@ -10,6 +10,7 @@ import SpecCanvas from '@/components/table/SpecCanvas.vue'
 import { ApiError } from '@/api/http'
 import { useChatStore } from '@/stores/chat'
 import { useSpecTableStore } from '@/stores/specTable'
+import { formatRelativeTime } from '@/utils/time'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,21 +26,26 @@ const description = computed(() => spec.table?.description ?? '')
 const revision = computed(() => spec.table?.current_revision ?? 0)
 
 const showShare = ref(false)
+const showSessions = ref(false)
 
-const chatPlaceholder = computed(() => {
-  if (chat.messages.length > 0) return ''
-  return (
+/** 当前会话的状态摘要，显示在对话区头部 */
+const sessionHint = computed(() => {
+  const current = chat.currentSession
+  if (!current) return '新对话'
+  return `${current.message_count} 条消息 · ${formatRelativeTime(current.updated_at)}`
+})
+
+const chatPlaceholder = computed(
+  () =>
     '直接告诉我要怎么调整这张表，例如：\n\n' +
     '· 帮我建一张蓝牙耳机的参数表\n' +
     '· 把电池容量改成 5000mAh\n' +
     '· 续航分组下的参数都加上单位\n\n' +
-    '改动会自动应用，随时可以撤销。'
-  )
-})
+    '改动会自动应用，随时可以撤销。',
+)
 
 async function load() {
   if (!tableId.value) return
-  chat.reset()
   try {
     await spec.openTable(tableId.value)
   } catch (err) {
@@ -49,11 +55,27 @@ async function load() {
       message.error(err instanceof ApiError ? err.message : '加载失败')
     }
     void router.replace({ name: 'tables' })
+    return
   }
+  // 表打开之后再恢复历史对话，避免两处 loading 互相干扰
+  await chat.initForTable(tableId.value)
 }
 
 onMounted(load)
 watch(tableId, load)
+
+// ---------- 会话切换 ----------
+
+async function pickSession(id: string) {
+  showSessions.value = false
+  if (id === chat.sessionId) return
+  await chat.openSession(id)
+}
+
+function startNewSession() {
+  showSessions.value = false
+  chat.newSession()
+}
 
 // ---------- 画布 ----------
 
@@ -157,19 +179,72 @@ async function handleUndoMessage(messageId: string) {
         <div class="chat-col">
           <header class="chat-head">
             <span class="dot" :class="{ busy: chat.sending }" />
-            <span class="head-title">AI 助手</span>
-            <span class="head-sub">直接说你要怎么改</span>
+            <div class="head-text">
+              <span class="head-title">AI 助手</span>
+              <span class="head-sub ds-ellipsis">{{ sessionHint }}</span>
+            </div>
+
+            <div class="head-actions">
+              <n-popover
+                v-model:show="showSessions"
+                trigger="click"
+                placement="bottom-end"
+                :show-arrow="false"
+                raw
+              >
+                <template #trigger>
+                  <button type="button" class="head-btn" title="历史对话">
+                    <i class="ri-history-line" />
+                    <span v-if="chat.hasHistory" class="badge">{{ chat.sessions.length }}</span>
+                  </button>
+                </template>
+
+                <div class="session-panel">
+                  <div class="panel-head">历史对话</div>
+
+                  <div v-if="chat.sessions.length === 0" class="panel-empty">
+                    这张表还没有对话记录
+                  </div>
+
+                  <div v-else class="panel-list ds-scroll-y">
+                    <button
+                      v-for="s in chat.sessions"
+                      :key="s.id"
+                      type="button"
+                      class="session-item"
+                      :class="{ active: s.id === chat.sessionId }"
+                      @click="pickSession(s.id)"
+                    >
+                      <span class="session-title ds-ellipsis">{{ s.title || '未命名对话' }}</span>
+                      <span class="session-meta">
+                        {{ s.message_count }} 条 · {{ formatRelativeTime(s.updated_at) }}
+                      </span>
+                    </button>
+                  </div>
+
+                  <button type="button" class="panel-new" @click="startNewSession">
+                    <i class="ri-add-line" />
+                    新建对话
+                  </button>
+                </div>
+              </n-popover>
+
+              <button type="button" class="head-btn" title="新建对话" @click="startNewSession">
+                <i class="ri-add-line" />
+              </button>
+            </div>
           </header>
 
           <ChatPanel
             :messages="chat.messages"
             :sending="chat.sending"
+            :loading="chat.loadingHistory"
             @send="handleSend"
             @stop="chat.abort"
             @undo="handleUndoMessage"
           >
             <template #empty>
-              <p v-if="chatPlaceholder">{{ chatPlaceholder }}</p>
+              <p>{{ chatPlaceholder }}</p>
             </template>
           </ChatPanel>
         </div>
@@ -257,9 +332,9 @@ async function handleUndoMessage(messageId: string) {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   height: 56px;
-  padding: 0 22px;
+  padding: 0 14px 0 22px;
   border-bottom: 1px solid var(--ds-border);
   border-right: 1px solid var(--ds-border);
   background: var(--ds-surface);
@@ -268,6 +343,7 @@ async function handleUndoMessage(messageId: string) {
 .dot {
   width: 7px;
   height: 7px;
+  flex: none;
   border-radius: 50%;
   background: #18a058;
 }
@@ -283,6 +359,14 @@ async function handleUndoMessage(messageId: string) {
   }
 }
 
+.head-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
 .head-title {
   font-size: 14px;
   font-weight: 600;
@@ -290,8 +374,136 @@ async function handleUndoMessage(messageId: string) {
 }
 
 .head-sub {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--ds-text-tertiary);
+}
+
+.head-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.head-btn {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.head-btn:hover {
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+}
+
+.badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--ds-primary);
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* ---------- 历史对话面板 ---------- */
+
+.session-panel {
+  width: 300px;
+  padding: 8px;
+  border: 1px solid var(--ds-border);
+  border-radius: 12px;
+  background: var(--ds-surface);
+  box-shadow: 0 12px 32px rgba(18, 22, 34, 0.14);
+}
+
+.panel-head {
+  padding: 4px 8px 8px;
+  font-size: 11.5px;
+  color: var(--ds-text-tertiary);
+}
+
+.panel-empty {
+  padding: 18px 8px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ds-text-tertiary);
+}
+
+.panel-list {
+  max-height: 288px;
+}
+
+.session-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 8px;
+  margin-bottom: 2px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-item:hover {
+  background: var(--ds-surface-muted);
+}
+
+.session-item.active {
+  background: var(--ds-primary-soft);
+}
+
+.session-title {
+  font-size: 13px;
+  color: var(--ds-text);
+}
+
+.session-item.active .session-title {
+  color: var(--ds-primary);
+  font-weight: 500;
+}
+
+.session-meta {
+  font-size: 11px;
+  color: var(--ds-text-tertiary);
+}
+
+.panel-new {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--ds-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.panel-new:hover {
+  border-color: var(--ds-primary);
+  color: var(--ds-primary);
 }
 
 /* 空态引导由 ChatPanel 的 empty 插槽渲染在滚动区内 */

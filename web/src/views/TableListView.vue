@@ -18,6 +18,7 @@ import { ApiError } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { useSpecTableStore } from '@/stores/specTable'
 import type { TableSummary } from '@/types/api'
+import { formatRelativeTime } from '@/utils/time'
 
 const router = useRouter()
 const route = useRoute()
@@ -179,21 +180,6 @@ async function remove(table: TableSummary) {
 function describe(err: unknown) {
   return err instanceof ApiError ? err.message : '操作失败，请稍后重试'
 }
-
-function formatTime(iso: string) {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  const diff = Date.now() - d.getTime()
-  const minute = 60_000
-  const hour = 60 * minute
-  const day = 24 * hour
-
-  if (diff < minute) return '刚刚'
-  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`
-  if (diff < day) return `${Math.floor(diff / hour)} 小时前`
-  if (diff < 30 * day) return `${Math.floor(diff / day)} 天前`
-  return d.toLocaleDateString('zh-CN')
-}
 </script>
 
 <template>
@@ -261,7 +247,7 @@ function formatTime(iso: string) {
               <span class="stat">{{ table.item_count }} 个参数</span>
               <span class="dot">·</span>
               <span class="stat">r{{ table.current_revision }}</span>
-              <span class="time">{{ formatTime(table.updated_at) }}</span>
+              <span class="time">{{ formatRelativeTime(table.updated_at) }}</span>
             </div>
           </article>
         </div>

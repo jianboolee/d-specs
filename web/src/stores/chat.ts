@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 import * as chatApi from '@/api/chat'
 import { ApiError } from '@/api/http'
 import { useSpecTableStore } from './specTable'
-import type { ChatChange, ChatEvent } from '@/types/api'
+import type { ChatChange, ChatEvent, ChatSession } from '@/types/api'
 
 /** 界面上的一条消息 */
 export interface UiMessage {
@@ -24,6 +24,13 @@ export interface UiMessage {
   error?: string
   /** 已撤销 */
   undone?: boolean
+  /**
+   * 从历史记录恢复的消息。
+   *
+   * 历史里只存了文本，没有当时对应的 revision，所以不提供「撤销这一条」——
+   * 要回退请用画布上的撤销（它是按版本走的）。
+   */
+  restored?: boolean
 }
 
 /** 工具名的中文说明，让「正在检索参数」比裸工具名好懂 */
@@ -37,16 +44,24 @@ const TOOL_LABELS: Record<string, string> = {
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<UiMessage[]>([])
+  const sessions = ref<ChatSession[]>([])
   const sessionId = ref('')
   const sending = ref(false)
+  const loadingHistory = ref(false)
   const lastError = ref('')
 
   let controller: AbortController | null = null
   let seq = 0
+  /** 已拉取会话列表的表，避免重复请求 */
+  let sessionsTableId = ''
 
   const canSend = computed(() => !sending.value)
-
   const isEmpty = computed(() => messages.value.length === 0)
+  const hasHistory = computed(() => sessions.value.length > 0)
+
+  const currentSession = computed(() =>
+    sessions.value.find((s) => s.id === sessionId.value),
+  )
 
   function nextId(prefix: string) {
     seq += 1
@@ -59,6 +74,66 @@ export const useChatStore = defineStore('chat', () => {
     if (!text) return
     msg.text = msg.text ? `${msg.text}\n\n${text}` : text
   }
+
+  // ---------- 会话历史 ----------
+
+  /**
+   * 打开某张表时调用：拉会话列表，并自动恢复最近一次对话。
+   *
+   * 拉取失败不抛错也不挡路 —— 用户至少还能开始一段新对话。
+   */
+  async function initForTable(tableId: string) {
+    reset()
+    sessionsTableId = tableId
+    try {
+      sessions.value = await chatApi.listSessions(tableId)
+      const latest = sessions.value[0]
+      if (latest) {
+        await openSession(latest.id)
+      }
+    } catch {
+      sessions.value = []
+    }
+  }
+
+  async function refreshSessions() {
+    if (!sessionsTableId) return
+    try {
+      sessions.value = await chatApi.listSessions(sessionsTableId)
+    } catch {
+      // 列表刷新失败不影响对话本身
+    }
+  }
+
+  async function openSession(id: string) {
+    if (id === sessionId.value) return
+
+    abort()
+    loadingHistory.value = true
+    try {
+      const rows = await chatApi.listMessages(id)
+      messages.value = rows.map((row) => ({
+        id: row.id,
+        role: row.role,
+        text: row.content,
+        restored: true,
+      }))
+      sessionId.value = id
+    } catch (err) {
+      lastError.value = err instanceof ApiError ? err.message : '历史对话加载失败'
+    } finally {
+      loadingHistory.value = false
+    }
+  }
+
+  /** 开始一段新对话 */
+  function newSession() {
+    abort()
+    sessionId.value = ''
+    messages.value = []
+  }
+
+  // ---------- 发送 ----------
 
   async function send(text: string) {
     const content = text.trim()
@@ -107,6 +182,8 @@ export const useChatStore = defineStore('chat', () => {
       assistant.toolLabel = undefined
       sending.value = false
       controller = null
+      // 首次对话会新建会话，刷新列表让切换器里的条目与消息数保持准确
+      void refreshSessions()
     }
   }
 
@@ -181,7 +258,7 @@ export const useChatStore = defineStore('chat', () => {
   async function undoMessage(messageId: string) {
     const spec = useSpecTableStore()
     const msg = messages.value.find((m) => m.id === messageId)
-    if (!msg || !spec.canUndo) return false
+    if (!msg || msg.restored || !spec.canUndo) return false
 
     const res = await spec.undo()
     if (res) {
@@ -194,17 +271,27 @@ export const useChatStore = defineStore('chat', () => {
   function reset() {
     abort()
     messages.value = []
+    sessions.value = []
     sessionId.value = ''
     lastError.value = ''
+    sessionsTableId = ''
   }
 
   return {
     messages,
+    sessions,
     sessionId,
+    currentSession,
     sending,
+    loadingHistory,
     lastError,
     canSend,
     isEmpty,
+    hasHistory,
+    initForTable,
+    refreshSessions,
+    openSession,
+    newSession,
     send,
     abort,
     undoMessage,

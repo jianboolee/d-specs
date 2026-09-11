@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/donktech/d-specs/internal/infrastructure/idgen"
 
@@ -70,13 +71,27 @@ func (r *Repository) GetSession(ctx context.Context, userID, sessionID string) (
 	return &session, nil
 }
 
-func (r *Repository) ListSessions(ctx context.Context, userID, tableID string) ([]ChatSession, error) {
-	var rows []ChatSession
+// SessionSummary 会话列表项，带消息数
+type SessionSummary struct {
+	ID           string    `gorm:"column:id"`
+	TableID      string    `gorm:"column:table_id"`
+	Title        string    `gorm:"column:title"`
+	CreatedAt    time.Time `gorm:"column:created_at"`
+	UpdatedAt    time.Time `gorm:"column:updated_at"`
+	MessageCount int       `gorm:"column:message_count"`
+}
+
+func (r *Repository) ListSessions(ctx context.Context, userID, tableID string) ([]SessionSummary, error) {
+	var rows []SessionSummary
+	// 消息数用相关子查询一次带出，避免前端为了显示「N 条消息」再逐条请求
 	err := r.db.WithContext(ctx).
+		Table("chat_sessions").
+		Select("id, table_id, title, created_at, updated_at, "+
+			"(SELECT COUNT(*) FROM chat_messages WHERE chat_messages.session_id = chat_sessions.id) AS message_count").
 		Where("user_id = ? AND table_id = ?", userID, tableID).
 		Order("updated_at DESC").
 		Limit(50).
-		Find(&rows).Error
+		Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}

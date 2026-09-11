@@ -15,12 +15,16 @@ export interface ChatMessage {
   pending?: string
   error?: string
   undone?: boolean
+  /** 从历史记录恢复的消息（没有当时的版本号，因此不提供逐条撤销） */
+  restored?: boolean
 }
 
 const props = defineProps<{
   messages: ChatMessage[]
   sending?: boolean
   disabled?: boolean
+  /** 正在拉取历史对话 */
+  loading?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -107,7 +111,12 @@ function kindLabel(kind: ChatChange['kind']) {
                 已修改 {{ msg.changes!.length }} 处
                 <template v-if="msg.appliedRevision">· r{{ msg.appliedRevision }}</template>
               </span>
-              <button v-if="!msg.undone" type="button" class="undo" @click="emit('undo', msg.id)">
+              <button
+                v-if="!msg.undone && !msg.restored"
+                type="button"
+                class="undo"
+                @click="emit('undo', msg.id)"
+              >
                 <i class="ri-arrow-go-back-line" />
                 撤销
               </button>
@@ -144,8 +153,14 @@ function kindLabel(kind: ChatChange['kind']) {
         </div>
       </div>
 
+      <!-- 拉取历史时不要闪空态引导 -->
+      <div v-if="loading" class="chat-loading">
+        <i class="ri-loader-4-line spin" />
+        <span>正在加载历史对话…</span>
+      </div>
+
       <!-- 空态作为插槽放在滚动区内，避免用绝对定位叠在列表上 -->
-      <div v-if="messages.length === 0 && !sending" class="chat-empty">
+      <div v-else-if="messages.length === 0 && !sending" class="chat-empty">
         <slot name="empty" />
       </div>
     </div>
@@ -194,6 +209,17 @@ function kindLabel(kind: ChatChange['kind']) {
   flex: 1;
   min-height: 0;
   padding: 22px 22px 8px;
+}
+
+/* 历史加载态：占满滚动区居中 */
+.chat-loading {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ds-text-tertiary);
 }
 
 /* 空态：在滚动区里垂直居中，内容超高时随列表一起滚动 */
