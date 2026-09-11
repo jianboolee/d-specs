@@ -38,7 +38,7 @@ http-client.private.env.json   token 等（已 gitignore）
 |------|------|
 | `00-health.http` | 健康检查与依赖就绪（PostgreSQL / Redis / LLM） |
 | `10-auth.http` | 注册 / 登录 / 当前用户，含越权与校验失败的反例 |
-| `20-tables.http` | 参数表 CRUD、变更、乐观锁、版本恢复、复制 |
+| `20-tables.http` | 配置表 CRUD、变更、乐观锁、版本恢复、复制 |
 | `30-share.http` | 分享开启/关闭、公开读取、token 复用与失效 |
 | `40-chat.http` | AI 对话（SSE），含改动落库与会话多轮续接 |
 

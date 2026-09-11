@@ -37,7 +37,7 @@ type RevisionMeta struct {
 	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
 }
 
-// ==================== 参数表 ====================
+// ==================== 配置表 ====================
 
 func (r *Repository) ListTables(ctx context.Context, userID, keyword string, offset, limit int) ([]TableSummary, int64, error) {
 	query := r.db.WithContext(ctx).Model(&SpecTable{}).
@@ -91,7 +91,7 @@ func (r *Repository) CreateTable(
 		if err := replaceItems(tx, table.ID, initialItems); err != nil {
 			return err
 		}
-		return insertRevision(tx, table.ID, 0, initialItems, SourceUser, "创建参数表", nil)
+		return insertRevision(tx, table.ID, 0, initialItems, SourceUser, "创建配置表", nil)
 	})
 	if err != nil {
 		return nil, err

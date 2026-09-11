@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// 测试用参数表：刻意包含「不同分组下同名」的参数项，用于验证歧义处理
+// 测试用配置表：刻意包含「不同分组下同名」的参数项，用于验证歧义处理
 func snapshot() Snapshot {
 	return Snapshot{
 		Title: "示例手机 A1",
@@ -123,7 +123,7 @@ func TestNumberValueNormalization(t *testing.T) {
 	})
 
 	t.Run("带单位的数值原样保留，不做单位归一化", func(t *testing.T) {
-		// 参数表是给客户看的，用户写的「毫安时」不该被悄悄改成「mAh」
+		// 配置表是给客户看的，用户写的「毫安时」不该被悄悄改成「mAh」
 		next, _, err := Apply(snapshot(), []Op{{
 			Op:     OpUpdateItem,
 			ItemID: "a3",

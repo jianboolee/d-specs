@@ -38,7 +38,7 @@ const sessionHint = computed(() => {
 const chatPlaceholder = computed(
   () =>
     '直接告诉我要怎么调整这张表，例如：\n\n' +
-    '· 帮我建一张蓝牙耳机的参数表\n' +
+    '· 帮我建一张蓝牙耳机的配置表\n' +
     '· 把电池容量改成 5000mAh\n' +
     '· 续航分组下的参数都加上单位\n\n' +
     '改动会自动应用，随时可以撤销。',
@@ -50,7 +50,7 @@ async function load() {
     await spec.openTable(tableId.value)
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
-      message.error('参数表不存在或已删除')
+      message.error('配置表不存在或已删除')
     } else {
       message.error(err instanceof ApiError ? err.message : '加载失败')
     }
@@ -127,7 +127,7 @@ function handleRemoveTable() {
   const title = table.title
 
   dialog.warning({
-    title: '删除参数表',
+    title: '删除配置表',
     content: `确定删除「${title}」？删除后该表不再出现在列表里。`,
     positiveText: '删除',
     negativeText: '取消',
@@ -290,7 +290,7 @@ async function handleUndoMessage(messageId: string) {
       </div>
 
       <div v-else class="loading">
-        <p>参数表不存在</p>
+        <p>配置表不存在</p>
         <n-button size="small" @click="router.replace({ name: 'tables' })">返回列表</n-button>
       </div>
     </main>

@@ -511,7 +511,7 @@ var boolFalseValues = map[string]bool{
 // 只做校验与布尔/枚举的规范化。
 //
 // number 类型**只校验不改写**：用户写的「8小时」就原样保留，
-// 不该被悄悄改成「8h」—— 参数表是要给客户看的，措辞由用户决定。
+// 不该被悄悄改成「8h」—— 配置表是要给客户看的，措辞由用户决定。
 func normalizeValue(valueType, rawValue string, enumOptions []string, label string) (string, []error) {
 	value := strings.TrimSpace(rawValue)
 

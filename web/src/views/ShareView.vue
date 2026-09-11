@@ -42,7 +42,7 @@ onMounted(async () => {
 
   try {
     spec.value = await shareApi.getPublicSpec(token.value)
-    document.title = spec.value.title || '参数配置表'
+    document.title = spec.value.title || '产品配置表'
   } catch (err) {
     errorText.value =
       err instanceof ApiError ? err.message : '加载失败，请确认链接是否正确'
@@ -61,7 +61,7 @@ onUnmounted(() => {
     <header class="share-head">
       <div class="brand">
         <div class="brand-mark">配</div>
-        <span class="brand-name">参数配置表</span>
+        <span class="brand-name">产品配置表</span>
       </div>
       <span class="readonly-tag">只读分享</span>
     </header>
@@ -71,7 +71,7 @@ onUnmounted(() => {
 
       <div v-else-if="errorText" class="state error">
         <i class="ri-link-unlink-muted" />
-        <h1>无法打开这份参数表</h1>
+        <h1>无法打开这份配置表</h1>
         <p>{{ errorText }}</p>
         <p class="state-hint">可能是创建者已关闭分享，或者链接不完整。</p>
       </div>

@@ -1,6 +1,6 @@
 # d-specs API
 
-产品参数配置表的后端服务。Go + Gin + PostgreSQL + DeepSeek。
+产品产品配置表的后端服务。Go + Gin + PostgreSQL + DeepSeek。
 
 ## 快速开始
 
@@ -50,12 +50,12 @@ internal/
   router/     路由总装
   modules/
     auth/     注册 / 登录 / JWT
-    spec/     参数表 CRUD、变更执行器、版本与撤销
+    spec/     配置表 CRUD、变更执行器、版本与撤销
     chat/     AI 对话编排、SSE、会话与审计落库
     share/    只读分享链接
   ai/
     provider/ LLM 供应商抽象 + DeepSeek 实现
-    ops/      参数表变更协议：校验与应用（纯逻辑，重点单测）
+    ops/      配置表变更协议：校验与应用（纯逻辑，重点单测）
     tools/    暴露给模型的工具定义与只读工具实现
     agent/    agent loop + system prompt + ApplyHook
 pkg/
@@ -89,7 +89,7 @@ Flash 档位时可靠性的主要来源，详见 `internal/ai/agent/agent.go`。
 ### 上下文只带 schema，按需取数
 
 system prompt 只包含参数名与分组，不含参数值；需要值时模型用
-`search_items` / `get_items` 主动拉取。参数表可能有几百条，全量塞进上下文
+`search_items` / `get_items` 主动拉取。配置表可能有几百条，全量塞进上下文
 必然撑爆窗口（见 `internal/ai/agent/prompt.go`）。
 
 ## 配置
@@ -139,7 +139,7 @@ POST /api/v1/auth/register              注册
 POST /api/v1/auth/login                 登录
 GET  /api/v1/me                         当前用户
 
-# 参数表（均需 Bearer Token）
+# 配置表（均需 Bearer Token）
 GET    /api/v1/tables                   列表（keyword / page / size）
 POST   /api/v1/tables                   建表
 GET    /api/v1/tables/:id               详情（表 + 全部参数项 + 分组）
@@ -205,7 +205,7 @@ GET    /api/v1/public/specs/:token      公开只读内容（无需鉴权）
 这是有意为之：隔离不能依赖 handler 或 service 自觉，签名定死之后，
 漏加过滤条件会直接编译不过，而不是变成一次越权查询。
 
-越权访问一律返回 **404「参数表不存在」**，而不是 403 ——
+越权访问一律返回 **404「配置表不存在」**，而不是 403 ——
 否则等于告诉攻击者这个 id 是真实存在的。
 
 **唯一的例外**是 `share.Repository.resolveByToken`：公开分享页天然没有登录用户，

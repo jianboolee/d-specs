@@ -55,7 +55,7 @@ async function submit() {
       message.success('登录成功')
     }
 
-    // 没有指定去向时回首页（欢迎页），而不是直接摊开参数表列表
+    // 没有指定去向时回首页（欢迎页），而不是直接摊开配置表列表
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     await router.replace(redirect)
   } catch (err) {
@@ -76,8 +76,8 @@ async function submit() {
       <div class="brand">
         <div class="brand-mark">配</div>
         <div class="brand-text">
-          <h1>参数配置表</h1>
-          <p>用对话的方式，为每个产品维护一份参数表</p>
+          <h1>产品配置表</h1>
+          <p>用对话的方式，为每个产品维护一份配置表</p>
         </div>
       </div>
 
@@ -133,7 +133,7 @@ async function submit() {
 
       <div class="hint">
         <template v-if="isRegister">
-          注册后即可创建你自己的参数表，每张表对应一个产品。
+          注册后即可创建你自己的配置表，每张表对应一个产品。
         </template>
         <template v-else>
           演示账号：<code>demo@dspecs.dev</code> / <code>demo12345</code>

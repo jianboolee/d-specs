@@ -208,8 +208,8 @@ func scenarios() []scenario {
 	return []scenario{
 		{
 			name:   "空表建表",
-			table:  ops.Snapshot{Title: "新建参数表"},
-			prompt: "帮我建一张蓝牙耳机的参数表，要有蓝牙版本、续航时间、单耳重量、充电接口这几个参数",
+			table:  ops.Snapshot{Title: "新建配置表"},
+			prompt: "帮我建一张蓝牙耳机的配置表，要有蓝牙版本、续航时间、单耳重量、充电接口这几个参数",
 			verify: func(res *agent.RunResult) error {
 				if !res.Applied {
 					return fmt.Errorf("模型没有产生任何变更（reply: %s）", oneLine(res.Reply))
@@ -338,7 +338,7 @@ func runScenario(cfg *config.Config, llm provider.Provider, sc scenario) bool {
 	return true
 }
 
-// sampleTable 一份用于验证的示例参数表
+// sampleTable 一份用于验证的示例配置表
 func sampleTable() ops.Snapshot {
 	return ops.Snapshot{
 		Title: "示例手机 A1",

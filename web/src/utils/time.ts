@@ -1,7 +1,7 @@
 /**
  * 相对时间：刚刚 / N 分钟前 / N 小时前 / N 天前，超过 30 天显示日期。
  *
- * 参数表与会话列表都用它，避免两处各写一份格式不一致。
+ * 配置表与会话列表都用它，避免两处各写一份格式不一致。
  */
 export function formatRelativeTime(iso: string): string {
   const date = new Date(iso)

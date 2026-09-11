@@ -173,7 +173,7 @@ function isHighlighted(id: string) {
           v-if="!readonly"
           type="button"
           class="ghost-btn danger"
-          title="删除这张参数表"
+          title="删除这张配置表"
           @click="emit('remove')"
         >
           <i class="ri-delete-bin-line" />

@@ -1,6 +1,6 @@
 // Package quantity 解析「数值 + 单位」形式的参数值。
 //
-// 参数表里大量数值带单位（5000mAh、45W、198g、6.7英寸）。AI 返回时单位可能
+// 配置表里大量数值带单位（5000mAh、45W、198g、6.7英寸）。AI 返回时单位可能
 // 写在值里、也可能单独给出，还可能写成中文别名。这里负责把它们归一化，
 // 让 spec_items.value 与 spec_items.unit 始终分开存放。
 package quantity
@@ -153,7 +153,7 @@ var normalizedLookup = func() map[string]string {
 
 // NormalizeUnit 归一化单位别名；无法识别时原样返回（去掉首尾空格）。
 //
-// 宁可保留未知单位也不要强行归一到错误的单位 —— 参数表里单位错了比不统一更糟。
+// 宁可保留未知单位也不要强行归一到错误的单位 —— 配置表里单位错了比不统一更糟。
 func NormalizeUnit(unit string) string {
 	u := strings.TrimSpace(unit)
 	if u == "" {

@@ -64,7 +64,7 @@ async function submitCreate() {
       industry: form.industry.trim(),
     })
     showCreate.value = false
-    message.success('参数表已创建')
+    message.success('配置表已创建')
     await router.push({ name: 'workspace', params: { id: res.table.id } })
   } catch (err) {
     message.error(describe(err))
@@ -73,7 +73,7 @@ async function submitCreate() {
   }
 }
 
-// 侧边栏的「新建参数表」通过 query 把用户送到这里
+// 侧边栏的「新建配置表」通过 query 把用户送到这里
 watch(
   () => route.query.new,
   (flag) => {
@@ -130,7 +130,7 @@ async function duplicate(table: TableSummary) {
 async function rename(table: TableSummary) {
   let next = table.title
   dialog.create({
-    title: '重命名参数表',
+    title: '重命名配置表',
     content: () =>
       h(NInput, {
         defaultValue: table.title,
@@ -161,7 +161,7 @@ async function rename(table: TableSummary) {
 
 function remove(table: TableSummary) {
   dialog.warning({
-    title: '删除参数表',
+    title: '删除配置表',
     content: `确定删除「${table.title}」？删除后该表不再出现在列表里。`,
     positiveText: '删除',
     negativeText: '取消',
@@ -193,12 +193,12 @@ function describe(err: unknown) {
           <button type="button" class="back-btn" title="返回首页" @click="router.push({ name: 'home' })">
             <i class="ri-arrow-left-line" />
           </button>
-          <h2>我的参数表</h2>
+          <h2>我的配置表</h2>
           <span v-if="spec.tables.length > 0" class="title-count">{{ spec.tables.length }}</span>
         </div>
         <n-button size="small" type="primary" @click="openCreate">
           <template #icon><i class="ri-add-line" /></template>
-          新建参数表
+          新建配置表
         </n-button>
       </header>
 
@@ -208,11 +208,11 @@ function describe(err: unknown) {
           <div class="empty-mark">
             <i class="ri-file-list-3-line" />
           </div>
-          <h3>还没有参数表</h3>
-          <p>每张参数表对应一个产品。<br />建好之后可以直接让 AI 帮你填充参数。</p>
+          <h3>还没有配置表</h3>
+          <p>每张配置表对应一个产品。<br />建好之后可以直接让 AI 帮你填充参数。</p>
           <n-button type="primary" @click="openCreate">
             <template #icon><i class="ri-add-line" /></template>
-            新建第一张参数表
+            新建第一张配置表
           </n-button>
         </div>
 
@@ -253,10 +253,10 @@ function describe(err: unknown) {
       </div>
     </main>
 
-    <!-- 新建参数表 -->
+    <!-- 新建配置表 -->
     <n-modal v-model:show="showCreate" :mask-closable="!creating">
       <div class="modal-card">
-        <h3>新建参数表</h3>
+        <h3>新建配置表</h3>
         <p class="modal-hint">一张表对应一个产品，创建后可以在左侧对话里让 AI 帮你填充参数。</p>
 
         <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" @keydown.enter.prevent>

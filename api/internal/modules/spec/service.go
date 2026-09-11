@@ -16,7 +16,7 @@ func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
 }
 
-// ==================== 参数表 ====================
+// ==================== 配置表 ====================
 
 func (s *Service) List(ctx context.Context, userID, keyword string, page, size int) (*ListResult, error) {
 	if page < 1 {

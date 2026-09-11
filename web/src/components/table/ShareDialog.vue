@@ -89,7 +89,7 @@ function describe(err: unknown) {
     @update:show="(value: boolean) => emit('update:show', value)"
   >
     <div class="share-card">
-      <h3>分享参数表</h3>
+      <h3>分享配置表</h3>
       <p class="share-sub">「{{ tableTitle }}」</p>
 
       <div v-if="loading" class="share-loading">加载中…</div>
