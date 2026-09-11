@@ -79,7 +79,7 @@ function startNewSession() {
 
 // ---------- 画布 ----------
 
-async function handleUpdateItem(itemId: string, patch: { name?: string; value?: string; unit?: string }) {
+async function handleUpdateItem(itemId: string, patch: { name?: string; value?: string }) {
   try {
     await spec.updateItem(itemId, patch, '手工修改参数')
   } catch (err) {
@@ -90,7 +90,6 @@ async function handleUpdateItem(itemId: string, patch: { name?: string; value?: 
 async function handleAddItem(draft: {
   name: string
   value: string
-  unit: string
   group_name: string
   value_type: 'text' | 'number'
 }) {
@@ -98,7 +97,6 @@ async function handleAddItem(draft: {
     await spec.addItem({
       name: draft.name,
       value: draft.value,
-      unit: draft.unit,
       value_type: draft.value_type,
       group_name: draft.group_name,
     })

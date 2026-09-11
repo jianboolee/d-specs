@@ -26,9 +26,9 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  'update-item': [itemId: string, patch: { name?: string; value?: string; unit?: string }]
+  'update-item': [itemId: string, patch: { name?: string; value?: string }]
   'add-item': [
-    draft: { name: string; value: string; unit: string; group_name: string; value_type: 'text' | 'number' },
+    draft: { name: string; value: string; group_name: string; value_type: 'text' | 'number' },
   ]
   'remove-item': [itemId: string, name: string]
   rename: [title: string]
@@ -71,7 +71,7 @@ const displayGroups = computed<ItemGroup[]>(() =>
  * 只在值真正变了时才发请求：`@change` 会在失焦时触发，
  * 用户点进点出不该产生一次变更和一个新版本。
  */
-function commitField(item: SpecItem, field: 'name' | 'value' | 'unit', raw: string) {
+function commitField(item: SpecItem, field: 'name' | 'value', raw: string) {
   const next = raw.trim()
   if (next === item[field]) return
   // 名称不允许被清空，其余字段允许（表示置空）
@@ -82,12 +82,12 @@ function commitField(item: SpecItem, field: 'name' | 'value' | 'unit', raw: stri
 // ---------- 新增参数 ----------
 
 const addingGroup = ref<string | null>(null)
-const draft = ref({ name: '', value: '', unit: '' })
+const draft = ref({ name: '', value: '' })
 const nameInput = ref<HTMLInputElement | null>(null)
 
 async function startAdd(groupName: string) {
   addingGroup.value = groupName
-  draft.value = { name: '', value: '', unit: '' }
+  draft.value = { name: '', value: '' }
   await nextTick()
   nameInput.value?.focus()
 }
@@ -99,15 +99,14 @@ function cancelAdd() {
 function confirmAdd() {
   const name = draft.value.name.trim()
   if (!name) return
-  const unit = draft.value.unit.trim()
+  const value = draft.value.value.trim()
   emit('add-item', {
     name,
-    value: draft.value.value.trim(),
-    unit,
+    value,
     group_name: addingGroup.value ?? '',
-    // 填了单位说明这是个带单位的量（198 g、5000 mAh），用 number 让服务端
-    // 把数值与单位拆开、并校验其可解析性；没填单位就按 text 存，最宽松
-    value_type: unit ? 'number' : 'text',
+    // 值以数字开头就按 number 存（服务端会校验它是不是「数字 + 可选单位」），
+    // 否则按 text。用 text 时最宽松，任何写法都不会被拒。
+    value_type: /^[-+]?\d/.test(value) ? 'number' : 'text',
   })
   addingGroup.value = null
 }
@@ -193,8 +192,7 @@ function isHighlighted(id: string) {
             <thead>
               <tr>
                 <th class="col-name">参数名</th>
-                <th class="col-value">值</th>
-                <th class="col-unit">单位</th>
+                <th class="col-value">参数值</th>
                 <th v-if="!readonly" class="col-actions" />
               </tr>
             </thead>
@@ -216,15 +214,6 @@ function isHighlighted(id: string) {
                     :placeholder="item.value_type === 'number' ? '数值' : '—'"
                     :inputmode="item.value_type === 'number' ? 'decimal' : 'text'"
                     @change="commitField(item, 'value', ($event.target as HTMLInputElement).value)"
-                  />
-                </td>
-                <td class="col-unit">
-                  <input
-                    class="cell-input muted"
-                    :value="item.unit"
-                    :readonly="readonly"
-                    placeholder="—"
-                    @change="commitField(item, 'unit', ($event.target as HTMLInputElement).value)"
                   />
                 </td>
                 <td v-if="!readonly" class="col-actions">
@@ -251,8 +240,12 @@ function isHighlighted(id: string) {
               @keydown.enter.prevent="confirmAdd"
               @keydown.esc="cancelAdd"
             />
-            <input v-model="draft.value" class="cell-input" placeholder="值" @keydown.enter.prevent="confirmAdd" />
-            <input v-model="draft.unit" class="cell-input" placeholder="单位" @keydown.enter.prevent="confirmAdd" />
+            <input
+              v-model="draft.value"
+              class="cell-input"
+              placeholder="参数值，如 5000mAh"
+              @keydown.enter.prevent="confirmAdd"
+            />
             <button type="button" class="confirm-btn" :disabled="!draft.name.trim()" @click="confirmAdd">确定</button>
             <button type="button" class="cancel-btn" @click="cancelAdd">取消</button>
           </div>
@@ -489,16 +482,11 @@ function isHighlighted(id: string) {
 }
 
 .col-name {
-  width: 36%;
+  width: 38%;
 }
 
 .col-value {
-  width: 32%;
-}
-
-.col-unit {
-  width: 20%;
-  color: var(--ds-text-secondary);
+  width: 62%;
 }
 
 .col-actions {
@@ -593,16 +581,13 @@ function isHighlighted(id: string) {
   border-color: var(--ds-border);
 }
 
+/* 现在是两个输入框：参数名稍窄，值占大头 */
 .new-row .cell-input:first-child {
-  flex: 1.2;
+  flex: 0 0 34%;
 }
 
 .new-row .cell-input:nth-child(2) {
   flex: 1;
-}
-
-.new-row .cell-input:nth-child(3) {
-  flex: 0.7;
 }
 
 .confirm-btn,

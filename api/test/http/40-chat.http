@@ -39,8 +39,7 @@ Authorization: Bearer {{token}}
 ?? status == 200
 ?? js response.parsedBody.data.items.length == 1
 ?? js response.parsedBody.data.items[0].name == 电池容量
-?? js response.parsedBody.data.items[0].value == 5000
-?? js response.parsedBody.data.items[0].unit == mAh
+?? js response.parsedBody.data.items[0].value == 5000mAh
 
 ### 会话应被记录，且可续接多轮
 # @name sessions
@@ -69,7 +68,7 @@ GET {{baseUrl}}/api/v1/tables/{{chatTableId}}
 Authorization: Bearer {{token}}
 
 ?? status == 200
-?? js response.parsedBody.data.items[0].value == 4800
+?? js response.parsedBody.data.items[0].value == 4800mAh
 
 ### 只读提问不应改数据
 GET {{baseUrl}}/api/v1/tables/{{chatTableId}}/revisions

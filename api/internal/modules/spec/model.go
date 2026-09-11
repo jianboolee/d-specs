@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/donktech/d-specs/internal/ai/ops"
+	"github.com/donktech/d-specs/pkg/quantity"
 )
 
 // SpecTable 参数表。一张表 = 一个产品的参数配置表。
@@ -29,7 +30,6 @@ type SpecItem struct {
 	TableID   string `gorm:"column:table_id"`
 	Name      string `gorm:"column:name"`
 	Value     string `gorm:"column:value"`
-	Unit      string `gorm:"column:unit"`
 	ValueType string `gorm:"column:value_type"`
 	// ValueNum value_type=number 时冗余存数值，支撑排序与区间筛选
 	ValueNum    *float64  `gorm:"column:value_num"`
@@ -87,7 +87,6 @@ func itemToModel(tableID string, it ops.Item) SpecItem {
 		TableID:     tableID,
 		Name:        it.Name,
 		Value:       it.Value,
-		Unit:        it.Unit,
 		ValueType:   it.ValueType,
 		EnumOptions: it.EnumOptions,
 		GroupName:   it.GroupName,
@@ -98,7 +97,10 @@ func itemToModel(tableID string, it ops.Item) SpecItem {
 		m.ValueType = ops.TypeText
 	}
 	if m.ValueType == ops.TypeNumber {
-		if num, ok := parseFloat(it.Value); ok {
+		// 用 quantity 而不是 strconv：参数值现在带着单位（5000mAh、8小时），
+		// 直接 ParseFloat 会一律失败，value_num 永远为空
+		if parsed, err := quantity.Parse(it.Value); err == nil {
+			num := parsed.Number
 			m.ValueNum = &num
 		}
 	}
@@ -110,7 +112,6 @@ func modelToItem(m SpecItem) ops.Item {
 		ID:          m.ID,
 		Name:        m.Name,
 		Value:       m.Value,
-		Unit:        m.Unit,
 		ValueType:   m.ValueType,
 		EnumOptions: m.EnumOptions,
 		GroupName:   m.GroupName,

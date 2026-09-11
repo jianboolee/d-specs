@@ -55,7 +55,6 @@ type PublicGroup struct {
 type PublicItem struct {
 	Name      string `json:"name"`
 	Value     string `json:"value"`
-	Unit      string `json:"unit"`
 	ValueType string `json:"value_type"`
 	Remark    string `json:"remark,omitempty"`
 }

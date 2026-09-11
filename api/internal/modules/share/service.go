@@ -120,7 +120,6 @@ func groupRows(rows []publicItemRow) []PublicGroup {
 		groups[idx].Items = append(groups[idx].Items, PublicItem{
 			Name:      r.Name,
 			Value:     r.Value,
-			Unit:      r.Unit,
 			ValueType: r.ValueType,
 			Remark:    r.Remark,
 		})

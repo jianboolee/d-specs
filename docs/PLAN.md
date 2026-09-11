@@ -27,15 +27,15 @@
 
 ```
 产品：某型号手机
-┌──────────┬────────┬───────┬──────────┐
-│ 分组      │ 参数名   │ 参数值 │ 单位      │
-├──────────┼────────┼───────┼──────────┤
-│ 外观      │ 机身颜色 │ 钛金属 │          │
-│ 外观      │ 重量     │ 198   │ g        │
-│ 性能      │ 处理器   │ A18   │          │
-│ 续航      │ 电池容量 │ 5000  │ mAh      │
-│ 续航      │ 充电功率 │ 45    │ W        │
-└──────────┴────────┴───────┴──────────┘
+┌──────────┬────────────┬──────────────────┐
+│ 分组      │ 参数名      │ 参数值            │
+├──────────┼────────────┼──────────────────┤
+│ 外观      │ 机身颜色    │ 钛金属            │
+│ 外观      │ 重量        │ 198g             │
+│ 性能      │ 处理器      │ A18              │
+│ 续航      │ 电池容量    │ 5000mAh          │
+│ 续航      │ 充电功率    │ 45W              │
+└──────────┴────────────┴──────────────────┘
 ```
 
 **为什么是「行=参数项」而不是「列=参数」：**
@@ -51,12 +51,18 @@
 
 | 类型 | 用途 | 示例 |
 |------|------|------|
-| `text` | 自由文本 | 「钛金属」 |
-| `number` | 数值 + 单位 | 5000 / mAh |
+| `text` | 自由文本 | 「钛金属」「1.5-2.0kg」 |
+| `number` | 单个数值 + 可选单位，服务端校验其可解析 | 「5000mAh」「8小时」 |
 | `bool` | 支持 / 不支持 | 「支持」 |
 | `enum` | 枚举单选 | 「USB-C / Lightning」 |
 
-> `number` 是重点：AI 收到「电池改成 5000mAh」必须解析成 `value=5000, unit=mAh`。需要独立解析器 + 单位归一化表 + 单测。解析不确定时回问用户，不要猜。
+> **参数值自带单位，单位不是独立字段。** 这一版把原来的「数值 / 单位」两列合并了：
+> 真实规格表就是这么写的（`5000mAh`、`132kW`），拆成两列反而会出现
+> 「值有、单位空」这类半截数据，也让 AI 每次都要做一次没必要的拆分。
+>
+> `number` 类型保留下来只做**校验**（挡掉「约五千」这种写进数值列的写法）
+> 并对数值部分建索引列 `value_num`，供后续排序与区间筛选。
+> 校验**只判断不改写** —— 用户写的「8小时」原样保留，不会被悄悄改成「8h」。
 
 ---
 
@@ -83,7 +89,6 @@
 | `table_id` | |
 | `name` | 参数名：「电池容量」 |
 | `value` | 参数值，TEXT 存储 |
-| `unit` | 单位：「mAh」 |
 | `value_type` | `text` / `number` / `bool` / `enum` |
 | `value_num` | `value_type=number` 时冗余存数值，支撑排序、范围校验、区间筛选 |
 | `enum_options` | JSONB，`value_type=enum` 的候选 |
@@ -116,7 +121,7 @@ ai_operations  (id, table_id, message_id, revision, ops JSONB, summary, status,
 
 spec_templates (id, name, industry, description, items JSONB, owner_id NULL,
                 is_system BOOL, created_at)
-               -- items = [{name, unit, value_type, group_name, sort_order}]
+               -- items = [{name, value, value_type, group_name, sort_order}]
                -- owner_id IS NULL → 系统内置模板
 
 share_links    (id, table_id, token UNIQUE, enabled BOOL,
@@ -160,9 +165,9 @@ AI 的唯一写通道是一个 tool：`propose_ops`。
 ### 3.3 Operation 集
 
 ```
-add_item      { name, value, unit, value_type, group_name, remark }
+add_item      { name, value, value_type, group_name, remark }
 add_items     { items: [...] }              -- 批量，AI 建整张表时用
-update_item   { item_id | name, patch: { value, unit, name, group_name, remark } }
+update_item   { item_id | name, patch: { value, name, group_name, remark } }
 delete_item   { item_id | name }
 reorder_items { order: [item_id, ...] }
 set_group     { item_ids: [...], group_name }
@@ -192,7 +197,7 @@ set_group     { item_ids: [...], group_name }
 
 - `item_id` 是否存在（不存在则尝试按 name 兜底解析）
 - `name` 是否重名 / 是否为空
-- `value_type=number` 时 `value` 能否解析为数值，单位是否可归一
+- `value_type=number` 时 `value` 能否解析为「数字 + 可选单位」
 - `value_type=enum` 时值是否在 `enum_options` 内
 - 批量操作的规模上限（防模型失控生成几千条）
 - 删除/改名是否产生歧义
@@ -206,7 +211,7 @@ Flash 容易在「所有分组都加一条」这类指令上逐条枚举、漏�
 引导 AI 输出条件式 op，例如：
 
 ```json
-{ "op": "add_item", "target": { "group": "续航" }, "name": "充电功率", "unit": "W" }
+{ "op": "add_item", "target": { "group": "续航" }, "name": "充电功率", "value": "45W" }
 ```
 
 由后端展开成对该分组下所有 item 的操作。既省 token 又消除遗漏。
@@ -315,7 +320,7 @@ event: done         {"usage":{"prompt":1200,"completion":300}}
 │          │                      │                          │
 │ + 新建    │ ┌────────────────┐   │  分组：续航      [+ 参数]  │
 │          │ │ 用户消息        │   │  ┌──────┬─────┬────┐    │
-│ ○ 手机A1  │ └────────────────┘   │  │参数名 │值   │单位│    │
+│ ○ 手机A1  │ └────────────────┘   │  │参数名 │参数值    │    │
 │ ○ 耳机B2  │ ┌────────────────┐   │  │电池容量│5000│mAh │✦  │
 │ ○ 音箱C3  │ │ AI：已更新…     │   │  │充电功率│45  │W   │    │
 │          │ │ ▸ 改 1 项  撤销  │   │  └──────┴─────┴────┘    │
@@ -349,7 +354,7 @@ event: done         {"usage":{"prompt":1200,"completion":300}}
 | 样式 | SCSS | 不引入 Tailwind，避免与团队既有范式并存 |
 | 状态 | Pinia | 对话面板与表格画布之间需共享状态，纯路由不够用 |
 | 图标 | remixicon | 与既有项目一致 |
-| 表格 | 自建 | 参数表列固定（参数名 / 值 / 单位 / 分组），用不上 headless 表格库 |
+| 表格 | 自建 | 参数表只有参数名 / 参数值两列，用不上 headless 表格库 |
 | Markdown | markdown-it + shiki | Phase 2 渲染 AI 回复 |
 | SSE | `@microsoft/fetch-event-source` | 原生 EventSource 不支持 POST + header |
 
@@ -381,7 +386,7 @@ internal/
     ops/        operation 解析/校验/应用（纯函数，重点单测）
     context/    上下文构建与压缩
 migrations/
-pkg/            单位解析、diff、jsonb 辅助
+pkg/            数值校验、diff、jsonb 辅助
 ```
 
 ```
@@ -406,7 +411,7 @@ src/
 - 统一响应格式、日志、request id、panic recover
 - AI 层：DeepSeek provider + `ops` 校验协议 + tool 定义 + agent loop
 - **AI 连通性验证工具** `cmd/aicheck` —— 已实测通过，结论见 3.9
-- 单测 73 例（`ops` 校验器与单位解析为重点），接口用例 13 项
+- 单测 94 例（`ops` 校验器与数值解析为重点），接口用例 60 项
 - 前端：登录页（已接通后端）、参数表列表页、工作区三栏界面预览、分享只读页
 
 > AI 层与验证工具提前到 P0，是因为决策 4 只接 Flash、决策 5 首版到 P2 ——
@@ -473,7 +478,7 @@ src/
 | AI 幻觉 item / 值 | 数据被污染 | 严格校验 + 全量审计（`ai_operations`）+ revision 快照 |
 | 上下文超限（参数多） | AI 不可用 | schema-only 提示 + 只读工具按需取数（3.7） |
 | 并发编辑冲突 | 数据覆盖 | `current_revision` 乐观锁，409 让前端提示刷新 |
-| 数值 + 单位解析错 | 参数不准 | 独立解析器 + 单位归一表 + 单测；不确定就回问 |
+| 数值写法不规范（如「约五千」写进数值列） | 参数不准 | `number` 只校验不改写；不合格时报错并提示改用 text |
 | 手工 / AI 行为不一致 | 逻辑割裂 | 共用同一个 `apply` 执行器（第 4 节） |
 | 自动应用误改用户数据 | 信任受损 | revision 快照 + 一键撤销 + 安全阀 + `ai_operations` 可追溯 |
 | 用户数据越权访问 | 严重事故 | repository 层强制 `user_id` 过滤 + 跨用户访问集成测试 |

@@ -25,7 +25,7 @@ Content-Type: application/json
 {
   "base_revision": 0,
   "ops": [
-    { "op": "add_item", "item": { "name": "电池容量", "value": "5000", "unit": "mAh", "value_type": "number", "group_name": "续航" } }
+    { "op": "add_item", "item": { "name": "电池容量", "value": "5000mAh", "value_type": "number", "group_name": "续航" } }
   ]
 }
 
@@ -66,6 +66,7 @@ GET {{baseUrl}}/api/v1/public/specs/{{shareToken}}
 ?? js response.parsedBody.data.groups.length == 1
 ?? js response.parsedBody.data.groups[0].items.length == 1
 ?? js response.parsedBody.data.groups[0].items[0].name == 电池容量
+?? js response.parsedBody.data.groups[0].items[0].value == 5000mAh
 
 ### 公开响应不应暴露表 id 与参数项 id
 GET {{baseUrl}}/api/v1/public/specs/{{shareToken}}

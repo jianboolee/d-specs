@@ -54,7 +54,7 @@ Content-Type: application/json
   "summary": "初始化参数",
   "ops": [
     { "op": "add_item", "item": { "name": "电池容量", "value": "5000mAh", "value_type": "number", "group_name": "续航" } },
-    { "op": "add_item", "item": { "name": "充电功率", "value": "45", "unit": "W", "value_type": "number", "group_name": "续航" } },
+    { "op": "add_item", "item": { "name": "充电功率", "value": "45W", "value_type": "number", "group_name": "续航" } },
     { "op": "add_item", "item": { "name": "无线充电", "value": "支持", "value_type": "bool", "group_name": "续航" } }
   ]
 }

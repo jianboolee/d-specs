@@ -108,7 +108,7 @@ func TestCrossUserIsolation(t *testing.T) {
 	tableID := created.Table.ID
 
 	applyItems(t, svc, owner, tableID, "初始参数",
-		ops.Op{Op: ops.OpAddItem, Item: &ops.Draft{Name: "电池容量", Value: "5000", Unit: "mAh", ValueType: ops.TypeNumber, GroupName: "续航"}},
+		ops.Op{Op: ops.OpAddItem, Item: &ops.Draft{Name: "电池容量", Value: "5000mAh", ValueType: ops.TypeNumber, GroupName: "续航"}},
 	)
 
 	// 下面每一项都必须失败，且返回「不存在」而不是「无权限」——
@@ -237,7 +237,7 @@ func TestApplyPersistsItemsAndRevision(t *testing.T) {
 		t.Errorf("期望 2 条变更，实际 %d", len(res.Changes))
 	}
 
-	// 参数项应落库，且数值与单位被正确拆分
+	// 参数项应落库，值按原样保存（单位已在值里）
 	_, items, err := repo.GetTableWithItems(ctx, userID, tableID)
 	if err != nil {
 		t.Fatalf("读取参数项失败: %v", err)
@@ -255,8 +255,8 @@ func TestApplyPersistsItemsAndRevision(t *testing.T) {
 	if battery == nil {
 		t.Fatal("找不到「电池容量」")
 	}
-	if battery.Value != "5000" || battery.Unit != "mAh" {
-		t.Errorf("数值与单位未正确拆分: value=%q unit=%q", battery.Value, battery.Unit)
+	if battery.Value != "5000mAh" {
+		t.Errorf("参数值期望 5000mAh，实际 %q", battery.Value)
 	}
 
 	// value_num 冗余列应被填充，供后续排序与区间筛选使用
@@ -341,7 +341,7 @@ func TestApplyRejectsInvalidOps(t *testing.T) {
 	tableID := created.Table.ID
 
 	applyItems(t, svc, userID, tableID, "建一项",
-		ops.Op{Op: ops.OpAddItem, Item: &ops.Draft{Name: "重量", Value: "198", Unit: "g", ValueType: ops.TypeNumber}},
+		ops.Op{Op: ops.OpAddItem, Item: &ops.Draft{Name: "重量", Value: "198g", ValueType: ops.TypeNumber}},
 	)
 
 	// 位置不存在的 item_id
@@ -459,8 +459,8 @@ func TestDuplicateTable(t *testing.T) {
 	srcID := created.Table.ID
 
 	applyItems(t, svc, userID, srcID, "加参数",
-		ops.Op{Op: ops.OpAddItem, Item: &ops.Draft{Name: "电池容量", Value: "5000", Unit: "mAh", ValueType: ops.TypeNumber, GroupName: "续航"}},
-		ops.Op{Op: ops.OpAddItem, Item: &ops.Draft{Name: "重量", Value: "198", Unit: "g", ValueType: ops.TypeNumber, GroupName: "外观"}},
+		ops.Op{Op: ops.OpAddItem, Item: &ops.Draft{Name: "电池容量", Value: "5000mAh", ValueType: ops.TypeNumber, GroupName: "续航"}},
+		ops.Op{Op: ops.OpAddItem, Item: &ops.Draft{Name: "重量", Value: "198g", ValueType: ops.TypeNumber, GroupName: "外观"}},
 	)
 
 	copied, err := svc.Duplicate(ctx, userID, srcID, DuplicateRequest{Title: "新产品"})

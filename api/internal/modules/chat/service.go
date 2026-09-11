@@ -329,12 +329,9 @@ func toChangeViews(changes []ops.Change) []ChangeView {
 }
 
 func formatItemValue(item ops.Item) string {
-	value := item.Value
-	if value == "" {
-		value = "—"
+	if item.Value == "" {
+		return "—"
 	}
-	if item.Unit != "" {
-		return value + " " + item.Unit
-	}
-	return value
+	// 值本身已包含单位，直接展示
+	return item.Value
 }

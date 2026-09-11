@@ -142,10 +142,9 @@ func checkToolCalling(cfg *config.Config, llm provider.Provider) bool {
 			"type": "object",
 			"properties": map[string]any{
 				"param_name": map[string]any{"type": "string", "description": "参数名，例如「电池容量」"},
-				"value":      map[string]any{"type": "string", "description": "参数值，只填数字部分"},
-				"unit":       map[string]any{"type": "string", "description": "单位，例如 mAh"},
+				"value":      map[string]any{"type": "string", "description": "参数值，单位直接写在值里，例如 5000mAh"},
 			},
-			"required": []string{"param_name", "value", "unit"},
+			"required": []string{"param_name", "value"},
 		},
 	)
 
@@ -187,15 +186,14 @@ func checkToolCalling(cfg *config.Config, llm provider.Provider) bool {
 	pretty, _ := json.Marshal(args)
 	fmt.Printf("  ✓ 正确调用工具，参数: %s\n", string(pretty))
 
-	// 关键校验：数值与单位必须被拆开
+	// 关键校验：值里必须带单位，不能被拆成「数字 + 单位」两个字段
 	value := strings.TrimSpace(fmt.Sprintf("%v", args["value"]))
-	unit := strings.TrimSpace(fmt.Sprintf("%v", args["unit"]))
-	if value == "5000" && unit == "mAh" {
-		fmt.Println("  ✓ 数值与单位拆分正确（value=5000, unit=mAh）")
+	if strings.ReplaceAll(value, " ", "") == "5000mAh" {
+		fmt.Println("  ✓ 参数值完整含单位（value=5000mAh）")
 		return true
 	}
-	fmt.Printf("  ⚠ 数值/单位拆分不理想（value=%q unit=%q），期望 value=5000 unit=mAh\n", value, unit)
-	fmt.Println("    提示：这会影响参数表的数据质量，需要靠 system prompt 与校验器兜住")
+	fmt.Printf("  ⚠ 参数值不理想（value=%q），期望 value=5000mAh\n", value)
+	fmt.Println("    提示：单位被拆出去会丢信息，需要靠 system prompt 与工具 schema 兜住")
 	return false
 }
 
@@ -229,7 +227,7 @@ func scenarios() []scenario {
 			},
 		},
 		{
-			name:   "按名称改值（含单位拆分）",
+			name:   "按名称改值（值含单位）",
 			table:  sampleTable(),
 			prompt: "电池容量改成 5000mAh",
 			verify: func(res *agent.RunResult) error {
@@ -240,8 +238,9 @@ func scenarios() []scenario {
 					if it.Name != "电池容量" {
 						continue
 					}
-					if it.Value != "5000" || it.Unit != "mAh" {
-						return fmt.Errorf("期望 value=5000 unit=mAh，实际 value=%q unit=%q", it.Value, it.Unit)
+					// 单位与数值是一个整体，不该被拆开
+					if strings.ReplaceAll(it.Value, " ", "") != "5000mAh" {
+						return fmt.Errorf("期望 value=5000mAh，实际 value=%q", it.Value)
 					}
 					return nil
 				}
@@ -251,7 +250,7 @@ func scenarios() []scenario {
 		{
 			name:   "批量条件式改动",
 			table:  sampleTable(),
-			prompt: "把续航分组下所有参数的数值都翻倍",
+			prompt: "把续航分组下所有参数的数值都翻倍，各自的单位保持不变",
 			verify: func(res *agent.RunResult) error {
 				if !res.Applied {
 					return fmt.Errorf("模型没有产生变更（reply: %s）", oneLine(res.Reply))
@@ -260,12 +259,12 @@ func scenarios() []scenario {
 				for _, it := range res.Snapshot.Items {
 					switch it.Name {
 					case "电池容量":
-						if it.Value != "9600" {
-							return fmt.Errorf("电池容量期望 9600，实际 %s", it.Value)
+						if strings.ReplaceAll(it.Value, " ", "") != "9600mAh" {
+							return fmt.Errorf("电池容量期望 9600mAh，实际 %s", it.Value)
 						}
 					case "充电功率":
-						if it.Value != "60" {
-							return fmt.Errorf("充电功率期望 60，实际 %s", it.Value)
+						if strings.ReplaceAll(it.Value, " ", "") != "60W" {
+							return fmt.Errorf("充电功率期望 60W，实际 %s", it.Value)
 						}
 					}
 				}
@@ -345,10 +344,10 @@ func sampleTable() ops.Snapshot {
 		Title: "示例手机 A1",
 		Items: []ops.Item{
 			{ID: "itm001", Name: "机身颜色", Value: "钛金属", ValueType: ops.TypeText, GroupName: "外观", SortOrder: 0},
-			{ID: "itm002", Name: "重量", Value: "198", Unit: "g", ValueType: ops.TypeNumber, GroupName: "外观", SortOrder: 1},
+			{ID: "itm002", Name: "重量", Value: "198g", ValueType: ops.TypeNumber, GroupName: "外观", SortOrder: 1},
 			{ID: "itm003", Name: "处理器", Value: "A18", ValueType: ops.TypeText, GroupName: "性能", SortOrder: 2},
-			{ID: "itm004", Name: "电池容量", Value: "4800", Unit: "mAh", ValueType: ops.TypeNumber, GroupName: "续航", SortOrder: 3},
-			{ID: "itm005", Name: "充电功率", Value: "30", Unit: "W", ValueType: ops.TypeNumber, GroupName: "续航", SortOrder: 4},
+			{ID: "itm004", Name: "电池容量", Value: "4800mAh", ValueType: ops.TypeNumber, GroupName: "续航", SortOrder: 3},
+			{ID: "itm005", Name: "充电功率", Value: "30W", ValueType: ops.TypeNumber, GroupName: "续航", SortOrder: 4},
 		},
 	}
 }

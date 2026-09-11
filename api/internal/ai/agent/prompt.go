@@ -26,10 +26,13 @@ const systemPromptBase = `你是「参数配置表」的编辑助手，帮助企
 
 ## 参数值的写法
 
-- 带单位的数值用 value_type:"number"，**value 只填数字，单位填在 unit 里**。
-  正确：value="5000", unit="mAh"　　错误：value="5000mAh"
+参数表只有两列：参数名、参数值。**单位不是单独的字段，直接写在值里。**
+
+- 带单位的数值用 value_type:"number"，值写完整：
+  正确：value="5000mAh"、"8小时"、"198g"　　错误：把数字和单位拆开填
 - 布尔值用 value_type:"bool"，值填「支持」或「不支持」。
-- 只有 text 类型才可以把单位和描述一起写在 value 里（例如「1.5-2.0kg」这种区间）。
+- number 类型只接受「单个数字 + 可选单位」。像「1.5-2.0kg」「约 8 小时以上」
+  这种区间或描述性内容，要用 text 类型。
 - 新增参数时如果拿不准类型，就用 text，不要硬塞 number。
 
 ## 修改前要确认的事
@@ -61,7 +64,7 @@ func BuildSystemPrompt(s ops.Snapshot) string {
 
 	if len(s.Items) == 0 {
 		b.WriteString("\n这张表目前是空的。如果用户要建表，直接用 add_items 一次性建立全部参数项，\n")
-		b.WriteString("每项填好 name、value、unit、value_type 和 group_name。\n")
+		b.WriteString("每项填好 name、value、value_type 和 group_name。\n")
 		return b.String()
 	}
 

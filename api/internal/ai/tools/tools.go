@@ -155,8 +155,7 @@ func opSchema() map[string]any {
 				"description": "修改内容，只填需要改的字段，未填的字段保持原样",
 				"properties": map[string]any{
 					"name":         map[string]any{"type": "string", "description": "新的参数名"},
-					"value":        map[string]any{"type": "string", "description": "新的参数值。number 类型只填数字，单位填在 unit 里"},
-					"unit":         map[string]any{"type": "string", "description": "新的单位，例如 mAh、W、g"},
+					"value":        map[string]any{"type": "string", "description": "新的参数值。单位直接写在值里，例如 5000mAh、8小时、198g"},
 					"value_type":   map[string]any{"type": "string", "enum": []string{ops.TypeText, ops.TypeNumber, ops.TypeBool, ops.TypeEnum}},
 					"enum_options": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "value_type=enum 时的候选值"},
 					"group_name":   map[string]any{"type": "string", "description": "新的分组名；传空字符串表示移出分组"},
@@ -187,8 +186,7 @@ func draftSchema(description string) map[string]any {
 		"type": "object",
 		"properties": map[string]any{
 			"name":       map[string]any{"type": "string", "description": "参数名，例如「电池容量」"},
-			"value":      map[string]any{"type": "string", "description": "参数值。number 类型只填数字部分，例如 5000；单位填在 unit 里"},
-			"unit":       map[string]any{"type": "string", "description": "单位，例如 mAh、W、g。没有单位就留空"},
+			"value":      map[string]any{"type": "string", "description": "参数值。单位直接写在值里，例如 5000mAh、8小时、198g"},
 			"value_type": map[string]any{"type": "string", "enum": []string{ops.TypeText, ops.TypeNumber, ops.TypeBool, ops.TypeEnum}, "description": "默认 text；带单位的数值用 number"},
 			"enum_options": map[string]any{
 				"type":        "array",
@@ -268,7 +266,6 @@ type schemaItem struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
 	ValueType string `json:"value_type"`
-	Unit      string `json:"unit,omitempty"`
 	GroupName string `json:"group_name,omitempty"`
 }
 
@@ -293,7 +290,6 @@ func (r *Registry) getSchema() schemaResult {
 			ID:        it.ID,
 			Name:      it.Name,
 			ValueType: it.ValueType,
-			Unit:      it.Unit,
 			GroupName: it.GroupName,
 		})
 	}

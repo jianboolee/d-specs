@@ -43,11 +43,13 @@ var validValueTypes = map[string]bool{
 }
 
 // Item 参数项
+//
+// 单位不是独立字段：参数值本身写完整（5000mAh、8小时、198g），
+// 这样既贴近真实规格表的写法，也不会出现「值有、单位空」的半截数据。
 type Item struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Value       string   `json:"value"`
-	Unit        string   `json:"unit"`
 	ValueType   string   `json:"value_type"`
 	EnumOptions []string `json:"enum_options,omitempty"`
 	GroupName   string   `json:"group_name"`
@@ -162,7 +164,6 @@ func (t *Target) Describe() string {
 type Draft struct {
 	Name        string   `json:"name"`
 	Value       string   `json:"value"`
-	Unit        string   `json:"unit"`
 	ValueType   string   `json:"value_type,omitempty"`
 	EnumOptions []string `json:"enum_options,omitempty"`
 	GroupName   string   `json:"group_name,omitempty"`
@@ -173,7 +174,6 @@ type Draft struct {
 type Patch struct {
 	Name        *string   `json:"name,omitempty"`
 	Value       *string   `json:"value,omitempty"`
-	Unit        *string   `json:"unit,omitempty"`
 	ValueType   *string   `json:"value_type,omitempty"`
 	EnumOptions *[]string `json:"enum_options,omitempty"`
 	GroupName   *string   `json:"group_name,omitempty"`

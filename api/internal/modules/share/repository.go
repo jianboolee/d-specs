@@ -146,7 +146,6 @@ func (r *Repository) loadPublicTable(ctx context.Context, tableID string) (*publ
 type publicItemRow struct {
 	Name      string `gorm:"column:name"`
 	Value     string `gorm:"column:value"`
-	Unit      string `gorm:"column:unit"`
 	ValueType string `gorm:"column:value_type"`
 	Remark    string `gorm:"column:remark"`
 	GroupName string `gorm:"column:group_name"`
@@ -156,7 +155,7 @@ func (r *Repository) loadPublicItems(ctx context.Context, tableID string) ([]pub
 	var rows []publicItemRow
 	err := r.db.WithContext(ctx).
 		Table("spec_items").
-		Select("name, value, unit, value_type, remark, group_name").
+		Select("name, value, value_type, remark, group_name").
 		Where("table_id = ?", tableID).
 		Order("sort_order ASC, created_at ASC").
 		Scan(&rows).Error

@@ -3,7 +3,6 @@ package ops
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/donktech/d-specs/internal/infrastructure/idgen"
@@ -161,7 +160,7 @@ func addItem(s *Snapshot, d Draft, label string) (Change, []error) {
 		return Change{}, []error{fmt.Errorf("%s：value_type=%q 不合法（可用：text、number、bool、enum）", label, d.ValueType)}
 	}
 
-	value, unit, errs := normalizeValue(valueType, d.Value, d.Unit, d.EnumOptions, label)
+	value, errs := normalizeValue(valueType, d.Value, d.EnumOptions, label)
 	if len(errs) > 0 {
 		return Change{}, errs
 	}
@@ -170,7 +169,6 @@ func addItem(s *Snapshot, d Draft, label string) (Change, []error) {
 		ID:          idgen.New(),
 		Name:        name,
 		Value:       value,
-		Unit:        unit,
 		ValueType:   valueType,
 		EnumOptions: append([]string(nil), d.EnumOptions...),
 		GroupName:   group,
@@ -260,20 +258,15 @@ func updateItem(s *Snapshot, id string, patch Patch, label string) (Change, []er
 
 	// 值可能随 patch 一起改，也可能因类型变化需要重新归一化
 	newValue := updated.Value
-	newUnit := updated.Unit
 	if patch.Value != nil {
 		newValue = *patch.Value
 	}
-	if patch.Unit != nil {
-		newUnit = *patch.Unit
-	}
 
-	value, unit, errs := normalizeValue(updated.ValueType, newValue, newUnit, updated.EnumOptions, label)
+	value, errs := normalizeValue(updated.ValueType, newValue, updated.EnumOptions, label)
 	if len(errs) > 0 {
 		return Change{}, errs
 	}
 	updated.Value = value
-	updated.Unit = unit
 
 	// 写回
 	*item = updated
@@ -499,7 +492,7 @@ func expandTarget(s *Snapshot, t *Target, label string) ([]string, error) {
 // ==================== 值归一化 ====================
 
 func (p Patch) isEmpty() bool {
-	return p.Name == nil && p.Value == nil && p.Unit == nil && p.ValueType == nil &&
+	return p.Name == nil && p.Value == nil && p.ValueType == nil &&
 		p.EnumOptions == nil && p.GroupName == nil && p.Remark == nil
 }
 
@@ -512,59 +505,57 @@ var boolFalseValues = map[string]bool{
 }
 
 // normalizeValue 按 value_type 归一化值，并把「5000mAh」拆成 value=5000 / unit=mAh
-func normalizeValue(valueType, rawValue, rawUnit string, enumOptions []string, label string) (string, string, []error) {
+// normalizeValue 按 value_type 归一化参数值。
+//
+// 单位不再是独立字段，直接写在值里（5000mAh、8小时、198g），所以这里
+// 只做校验与布尔/枚举的规范化。
+//
+// number 类型**只校验不改写**：用户写的「8小时」就原样保留，
+// 不该被悄悄改成「8h」—— 参数表是要给客户看的，措辞由用户决定。
+func normalizeValue(valueType, rawValue string, enumOptions []string, label string) (string, []error) {
 	value := strings.TrimSpace(rawValue)
-	unit := strings.TrimSpace(rawUnit)
 
 	if value == "" {
-		// 允许先建占位项（模板套用后待填），此时不该有单位
-		return "", unit, nil
+		// 允许先建占位项（模板套用后待填）
+		return "", nil
 	}
 
 	switch valueType {
 	case TypeNumber:
-		parsed, err := quantity.Parse(value)
-		if err != nil {
-			return value, unit, []error{fmt.Errorf(
-				"%s：value=%q 无法解析为数值（number 类型只接受单个数字，可带单位）；区间或描述性内容请改用 text 类型",
+		if _, err := quantity.Parse(value); err != nil {
+			return value, []error{fmt.Errorf(
+				"%s：value=%q 不是数值（number 类型只接受单个数字，可带单位，例如 5000mAh）；区间或描述性内容请改用 text 类型",
 				label, rawValue)}
 		}
-		if unit == "" {
-			unit = parsed.Unit
-		} else if parsed.Unit != "" && !quantity.SameUnit(unit, parsed.Unit) {
-			return value, unit, []error{fmt.Errorf(
-				"%s：value 中带的单位「%s」与 unit 字段「%s」不一致，请只保留一处",
-				label, parsed.Unit, unit)}
-		}
-		return strconv.FormatFloat(parsed.Number, 'f', -1, 64), quantity.NormalizeUnit(unit), nil
+		return value, nil
 
 	case TypeBool:
 		key := strings.ToLower(value)
 		switch {
 		case boolTrueValues[key]:
-			return "支持", "", nil
+			return "支持", nil
 		case boolFalseValues[key]:
-			return "不支持", "", nil
+			return "不支持", nil
 		default:
-			return value, unit, []error{fmt.Errorf(
+			return value, []error{fmt.Errorf(
 				"%s：value=%q 不是布尔值（bool 类型请用「支持」/「不支持」）", label, rawValue)}
 		}
 
 	case TypeEnum:
 		if len(enumOptions) == 0 {
-			return value, unit, []error{fmt.Errorf(
+			return value, []error{fmt.Errorf(
 				"%s：value_type=enum 但未提供 enum_options，请补充候选值或改用 text", label)}
 		}
 		for _, opt := range enumOptions {
 			if strings.EqualFold(strings.TrimSpace(opt), value) {
-				return strings.TrimSpace(opt), unit, nil
+				return strings.TrimSpace(opt), nil
 			}
 		}
-		return value, unit, []error{fmt.Errorf(
+		return value, []error{fmt.Errorf(
 			"%s：value=%q 不在候选值 %v 内", label, rawValue, enumOptions)}
 
 	default: // text
-		return value, unit, nil
+		return value, nil
 	}
 }
 

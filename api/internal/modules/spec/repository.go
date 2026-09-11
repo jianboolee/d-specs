@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -354,7 +353,7 @@ func replaceItems(tx *gorm.DB, tableID string, items []ops.Item) error {
 			Columns: []clause.Column{{Name: "id"}},
 			// 不含 updated_at / created_at：前者由触发器维护，后者只在插入时取默认值
 			DoUpdates: clause.AssignmentColumns([]string{
-				"name", "value", "unit", "value_type", "value_num",
+				"name", "value", "value_type", "value_num",
 				"enum_options", "group_name", "remark", "sort_order",
 			}),
 		}).Create(&rows).Error
@@ -414,17 +413,4 @@ func insertRevision(
 		Summary:  summary,
 		Ops:      opsJSON,
 	}).Error
-}
-
-// parseFloat 宽松解析数值，失败时返回 false（值会作为 text 处理）
-func parseFloat(raw string) (float64, bool) {
-	s := strings.TrimSpace(raw)
-	if s == "" {
-		return 0, false
-	}
-	num, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return 0, false
-	}
-	return num, true
 }

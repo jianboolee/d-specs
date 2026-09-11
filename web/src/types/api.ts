@@ -28,13 +28,12 @@ export type SpecValueType = 'text' | 'number' | 'bool' | 'enum'
  * 参数项。
  *
  * 一张参数表 = 一个产品的参数配置表，表内每行是一条参数项。
- * value 与 unit 分开存放：number 类型时 value 只存数字部分。
+ * 参数表只有两列：参数名、参数值 —— 单位直接写在值里（5000mAh、8小时）。
  */
 export interface SpecItem {
   id: string
   name: string
   value: string
-  unit: string
   value_type: SpecValueType
   enum_options?: string[]
   group_name: string
@@ -103,8 +102,8 @@ export type OpType =
 /** 新建参数项 */
 export interface ItemDraft {
   name: string
+  /** 参数值，单位直接写在里面（5000mAh、8小时） */
   value?: string
-  unit?: string
   value_type?: SpecValueType
   enum_options?: string[]
   group_name?: string
@@ -119,7 +118,6 @@ export interface ItemDraft {
 export interface ItemPatch {
   name?: string
   value?: string
-  unit?: string
   value_type?: SpecValueType
   enum_options?: string[]
   group_name?: string
@@ -256,7 +254,6 @@ export interface PublicGroup {
 export interface PublicItem {
   name: string
   value: string
-  unit: string
   value_type: SpecValueType
   remark?: string
 }

@@ -99,7 +99,6 @@ onUnmounted(() => {
                 <span class="spec-value" :class="{ empty: !item.value }">
                   {{ item.value || '待补充' }}
                 </span>
-                <span v-if="item.unit" class="spec-unit">{{ item.unit }}</span>
               </dd>
             </div>
           </dl>
@@ -288,13 +287,6 @@ onUnmounted(() => {
   color: var(--ds-text-tertiary);
   font-weight: 400;
   font-style: italic;
-}
-
-.spec-unit {
-  margin-left: 5px;
-  font-size: 12.5px;
-  font-weight: 400;
-  color: var(--ds-text-secondary);
 }
 
 .share-foot {

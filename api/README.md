@@ -59,7 +59,7 @@ internal/
     tools/    暴露给模型的工具定义与只读工具实现
     agent/    agent loop + system prompt + ApplyHook
 pkg/
-  quantity/   「数值 + 单位」解析与单位归一化
+  quantity/   数值校验：判断「5000mAh」是不是「数字 + 可选单位」
 migrations/   SQL 迁移（按时间戳命名，成对 up/down）
 ```
 
@@ -82,7 +82,7 @@ Flash 档位时可靠性的主要来源，详见 `internal/ai/agent/agent.go`。
 
 ### 服务端兜底条件式语义
 
-模型不必逐条枚举「要给哪几个参数加单位」，可以表达条件式目标
+模型不必逐条枚举「要改哪几个参数」，可以表达条件式目标
 （`target: {group: "续航"}`），由 `ops.expandTarget` 展开。
 这既省 token，也消除了弱模型逐条枚举时的漏项问题。
 
@@ -124,7 +124,7 @@ provider 已单独保留该字段（不展示、不回传），agent 在正文�
 想要的结果：多轮对话的边际 prompt 成本被显著摊薄。
 
 **function calling 稳定。** 4 个 Agent 场景（空表建表、按名称改值、批量条件
-改动、只读提问）全部一次通过，参数按 schema 正确拆分（`value=5000` / `unit=mAh`），
+改动、只读提问）全部通过，参数值含单位原样写入（`value=5000mAh`），
 只读提问也确实没有产生变更。Phase 2 无需切换到 JSON 模式退路。
 
 单次交互约 2~7 秒、2~3 轮工具调用。

@@ -11,10 +11,10 @@ func snapshot() Snapshot {
 		Title: "示例手机 A1",
 		Items: []Item{
 			{ID: "a1", Name: "机身颜色", Value: "钛金属", ValueType: TypeText, GroupName: "外观", SortOrder: 0},
-			{ID: "a2", Name: "重量", Value: "198", Unit: "g", ValueType: TypeNumber, GroupName: "外观", SortOrder: 1},
-			{ID: "a3", Name: "电池容量", Value: "4800", Unit: "mAh", ValueType: TypeNumber, GroupName: "续航", SortOrder: 2},
-			{ID: "a4", Name: "充电功率", Value: "30", Unit: "W", ValueType: TypeNumber, GroupName: "续航", SortOrder: 3},
-			{ID: "a5", Name: "重量", Value: "1.2", Unit: "kg", ValueType: TypeNumber, GroupName: "包装", SortOrder: 4},
+			{ID: "a2", Name: "重量", Value: "198g", ValueType: TypeNumber, GroupName: "外观", SortOrder: 1},
+			{ID: "a3", Name: "电池容量", Value: "4800mAh", ValueType: TypeNumber, GroupName: "续航", SortOrder: 2},
+			{ID: "a4", Name: "充电功率", Value: "30W", ValueType: TypeNumber, GroupName: "续航", SortOrder: 3},
+			{ID: "a5", Name: "重量", Value: "1.2kg", ValueType: TypeNumber, GroupName: "包装", SortOrder: 4},
 			{ID: "a6", Name: "无线充电", Value: "不支持", ValueType: TypeBool, GroupName: "续航", SortOrder: 5},
 			{ID: "a7", Name: "充电接口", Value: "USB-C", ValueType: TypeEnum, EnumOptions: []string{"USB-C", "Lightning"}, GroupName: "续航", SortOrder: 6},
 		},
@@ -63,7 +63,7 @@ func TestAddItem(t *testing.T) {
 		// 「重量」在 外观 与 包装 下各有一条，属于合理业务场景
 		_, _, err := Apply(snapshot(), []Op{{
 			Op:   OpAddItem,
-			Item: &Draft{Name: "重量", Value: "2.0", Unit: "kg", ValueType: TypeNumber, GroupName: "毛重"},
+			Item: &Draft{Name: "重量", Value: "2.0kg", ValueType: TypeNumber, GroupName: "毛重"},
 		}})
 		if err != nil {
 			t.Fatalf("跨分组重名不应报错: %v", err)
@@ -92,7 +92,7 @@ func TestAddItem(t *testing.T) {
 			Items: []Draft{
 				{Name: "蓝牙版本", Value: "5.3", ValueType: TypeText, GroupName: "连接"},
 				{Name: "NFC", Value: "支持", ValueType: TypeBool, GroupName: "连接"},
-				{Name: "扬声器数量", Value: "2", Unit: "个", ValueType: TypeNumber, GroupName: "连接"},
+				{Name: "扬声器数量", Value: "2个", ValueType: TypeNumber, GroupName: "连接"},
 			},
 		}})
 		if err != nil {
@@ -107,7 +107,7 @@ func TestAddItem(t *testing.T) {
 // ==================== 数值 + 单位 ====================
 
 func TestNumberValueNormalization(t *testing.T) {
-	t.Run("值与单位写在 value 里会被自动拆分", func(t *testing.T) {
+	t.Run("值与单位是一个整体，不该被拆开", func(t *testing.T) {
 		next, _, err := Apply(snapshot(), []Op{{
 			Op:     OpUpdateItem,
 			ItemID: "a3",
@@ -117,34 +117,39 @@ func TestNumberValueNormalization(t *testing.T) {
 			t.Fatalf("意外报错: %v", err)
 		}
 		item, _ := next.FindByID("a3")
-		if item.Value != "5000" || item.Unit != "mAh" {
-			t.Fatalf("期望 value=5000 unit=mAh，实际 value=%q unit=%q", item.Value, item.Unit)
+		if item.Value != "5000mAh" {
+			t.Fatalf("期望 value=5000mAh，实际 value=%q", item.Value)
 		}
 	})
 
-	t.Run("中文单位会被归一化", func(t *testing.T) {
+	t.Run("带单位的数值原样保留，不做单位归一化", func(t *testing.T) {
+		// 参数表是给客户看的，用户写的「毫安时」不该被悄悄改成「mAh」
 		next, _, err := Apply(snapshot(), []Op{{
 			Op:     OpUpdateItem,
 			ItemID: "a3",
-			Patch:  &Patch{Value: str("5000"), Unit: str("毫安时")},
+			Patch:  &Patch{Value: str("5000 毫安时")},
 		}})
 		if err != nil {
 			t.Fatalf("意外报错: %v", err)
 		}
 		item, _ := next.FindByID("a3")
-		if item.Unit != "mAh" {
-			t.Fatalf("期望单位归一为 mAh，实际 %q", item.Unit)
+		if item.Value != "5000 毫安时" {
+			t.Fatalf("期望原文保留，实际 %q", item.Value)
 		}
 	})
 
-	t.Run("value 与 unit 单位冲突被拒", func(t *testing.T) {
-		_, _, err := Apply(snapshot(), []Op{{
+	t.Run("中文数值单位混写也能通过校验", func(t *testing.T) {
+		next, _, err := Apply(snapshot(), []Op{{
 			Op:     OpUpdateItem,
 			ItemID: "a3",
-			Patch:  &Patch{Value: str("5000mAh"), Unit: str("W")},
+			Patch:  &Patch{Value: str("8小时")},
 		}})
-		if err == nil || !strings.Contains(err.Error(), "不一致") {
-			t.Fatalf("期望单位冲突报错，实际: %v", err)
+		if err != nil {
+			t.Fatalf("意外报错: %v", err)
+		}
+		item, _ := next.FindByID("a3")
+		if item.Value != "8小时" {
+			t.Fatalf("期望 8小时，实际 %q", item.Value)
 		}
 	})
 
@@ -462,7 +467,7 @@ func TestAtomicity(t *testing.T) {
 	if changes != nil {
 		t.Errorf("校验失败时不应返回变更，实际 %+v", changes)
 	}
-	if next.Items[2].Value != "4800" {
+	if next.Items[2].Value != "4800mAh" {
 		t.Errorf("校验失败时不应改动任何数据，a3 变成 %q", next.Items[2].Value)
 	}
 }
@@ -472,7 +477,7 @@ func TestValidateIsDryRun(t *testing.T) {
 	if errs := Validate(original, []Op{{Op: OpUpdateItem, ItemID: "a3", Patch: &Patch{Value: str("5000")}}}); len(errs) != 0 {
 		t.Fatalf("期望校验通过，实际 %v", errs)
 	}
-	if original.Items[2].Value != "4800" {
+	if original.Items[2].Value != "4800mAh" {
 		t.Error("Validate 不应改动输入快照")
 	}
 }
