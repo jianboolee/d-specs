@@ -7,7 +7,6 @@ import {
   NFormItem,
   NInput,
   NModal,
-  NPopconfirm,
   useDialog,
   useMessage,
 } from 'naive-ui'
@@ -104,7 +103,8 @@ function actionsFor(table: TableSummary): DropdownOption[] {
     { key: 'open', label: '打开' },
     { key: 'duplicate', label: '复制为新表' },
     { key: 'rename', label: '重命名' },
-    { key: 'delete', label: '删除' },
+    { type: 'divider', key: 'divider' },
+    { key: 'delete', label: '删除', props: { style: 'color: #d64545' } },
   ]
 }
 
@@ -166,13 +166,21 @@ async function rename(table: TableSummary) {
   })
 }
 
-async function remove(table: TableSummary) {
-  try {
-    await spec.removeTable(table.id)
-    message.success('已删除')
-  } catch (err) {
-    message.error(describe(err))
-  }
+function remove(table: TableSummary) {
+  dialog.warning({
+    title: '删除参数表',
+    content: `确定删除「${table.title}」？删除后该表不再出现在列表里。`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await spec.removeTable(table.id)
+        message.success(`已删除「${table.title}」`)
+      } catch (err) {
+        message.error(describe(err))
+      }
+    },
+  })
 }
 
 // ---------- 展示 ----------
@@ -222,21 +230,16 @@ function describe(err: unknown) {
           >
             <div class="card-head">
               <h3 class="ds-ellipsis">{{ table.title }}</h3>
-              <n-popconfirm @positive-click="remove(table)">
-                <template #trigger>
-                  <n-dropdown
-                    :options="actionsFor(table)"
-                    trigger="click"
-                    placement="bottom-end"
-                    @select="(key: string) => onAction(key, table)"
-                  >
-                    <button class="more-btn" type="button" @click.stop>
-                      <i class="ri-more-2-fill" />
-                    </button>
-                  </n-dropdown>
-                </template>
-                确定删除「{{ table.title }}」？
-              </n-popconfirm>
+              <n-dropdown
+                :options="actionsFor(table)"
+                trigger="click"
+                placement="bottom-end"
+                @select="(key: string) => onAction(key, table)"
+              >
+                <button class="more-btn" type="button" title="更多操作" @click.stop>
+                  <i class="ri-more-2-fill" />
+                </button>
+              </n-dropdown>
             </div>
 
             <p v-if="table.description" class="card-desc ds-ellipsis">{{ table.description }}</p>

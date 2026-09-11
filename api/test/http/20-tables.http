@@ -23,6 +23,9 @@ Content-Type: application/json
 ?? js response.parsedBody.data.table.id != undefined
 ?? js response.parsedBody.data.table.current_revision == 0
 
+### 新表的 id 应是 UUID v7（第 3 段以 7 开头，第 4 段以 8/9/a/b 开头）
+?? js /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(response.parsedBody.data.table.id) == true
+
 {{
   exports.tableId = response.parsedBody.data.table.id;
 }}
@@ -196,11 +199,25 @@ Content-Type: application/json
 
 ?? status == 404
 
-### 清理：删除测试表
+### 删除副本
 DELETE {{baseUrl}}/api/v1/tables/{{copyId}}
 Authorization: Bearer {{token}}
 
 ?? status == 200
+?? js response.parsedBody.data.deleted == true
+
+### 已删除的表取详情应 404（软删除）
+GET {{baseUrl}}/api/v1/tables/{{copyId}}
+Authorization: Bearer {{token}}
+
+?? status == 404
+
+### 已删除的表不应出现在列表里
+GET {{baseUrl}}/api/v1/tables?keyword=接口测试手机 A2
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.items.length == 0
 
 ### 清理：删除测试表
 DELETE {{baseUrl}}/api/v1/tables/{{tableId}}

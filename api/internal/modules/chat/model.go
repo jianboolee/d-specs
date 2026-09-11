@@ -125,8 +125,9 @@ type Emit func(Event) error
 // ==================== 请求 / 响应 ====================
 
 type SendRequest struct {
-	// SessionID 为空时自动新建会话
-	SessionID string `json:"session_id" binding:"max=32"`
+	// SessionID 为空时自动新建会话。
+	// 上限 36 是 UUID v7 的字符串长度（见 internal/infrastructure/idgen）
+	SessionID string `json:"session_id" binding:"max=36"`
 	Message   string `json:"message" binding:"required,max=4000"`
 }
 

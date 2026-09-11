@@ -121,6 +121,28 @@ function handleRemoveItem(itemId: string, name: string) {
   })
 }
 
+function handleRemoveTable() {
+  const table = spec.table
+  if (!table) return
+  const title = table.title
+
+  dialog.warning({
+    title: '删除参数表',
+    content: `确定删除「${title}」？删除后该表不再出现在列表里。`,
+    positiveText: '删除',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      try {
+        await spec.removeTable(table.id)
+        message.success(`已删除「${title}」`)
+        void router.replace({ name: 'tables' })
+      } catch (err) {
+        message.error(err instanceof ApiError ? err.message : '删除失败')
+      }
+    },
+  })
+}
+
 async function handleRename(next: string) {
   if (!spec.table) return
   try {
@@ -261,6 +283,7 @@ async function handleUndoMessage(messageId: string) {
           @remove-item="handleRemoveItem"
           @rename="handleRename"
           @share="showShare = true"
+          @remove="handleRemoveTable"
           @undo="handleUndo"
           @redo="handleRedo"
         />

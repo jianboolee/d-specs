@@ -43,7 +43,7 @@ internal/
     auth/     JWT 签发与校验
     cache/    Redis
     database/ GORM + PostgreSQL
-    idgen/    对外短 ID 生成
+    idgen/    实体 ID（UUID v7）与分享 token 生成
     logger/   slog
   middleware/ auth / cors / recover / request_id
   response/   统一响应体与中文校验错误

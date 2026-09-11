@@ -12,8 +12,8 @@ type CreateRequest struct {
 	Title       string `json:"title" binding:"required,max=120"`
 	Description string `json:"description" binding:"max=2000"`
 	Industry    string `json:"industry" binding:"max=64"`
-	// TemplateID 预留：套用模板建表（P3）
-	TemplateID string `json:"template_id" binding:"max=32"`
+	// TemplateID 预留：套用模板建表（P3）；上限按 UUID v7 的 36 位字符
+	TemplateID string `json:"template_id" binding:"max=36"`
 }
 
 type UpdateRequest struct {

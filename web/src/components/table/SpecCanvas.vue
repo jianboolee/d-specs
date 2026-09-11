@@ -33,6 +33,7 @@ const emit = defineEmits<{
   'remove-item': [itemId: string, name: string]
   rename: [title: string]
   share: []
+  remove: []
   undo: []
   redo: []
 }>()
@@ -167,6 +168,15 @@ function isHighlighted(id: string) {
         </button>
         <button v-if="!readonly" type="button" class="ghost-btn" @click="emit('share')">
           <i class="ri-share-line" /> 分享
+        </button>
+        <button
+          v-if="!readonly"
+          type="button"
+          class="ghost-btn danger"
+          title="删除这张参数表"
+          @click="emit('remove')"
+        >
+          <i class="ri-delete-bin-line" />
         </button>
       </div>
     </header>
@@ -377,6 +387,13 @@ function isHighlighted(id: string) {
 .ghost-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* 危险操作：平时中性，悬停才显红，避免误点 */
+.ghost-btn.danger:hover:not(:disabled) {
+  border-color: #d64545;
+  color: #d64545;
+  background: rgba(214, 69, 69, 0.08);
 }
 
 .canvas-body {
