@@ -398,13 +398,35 @@ async function handleUndoMessage(messageId: string) {
 }
 
 .chat-col {
-  width: 42%;
-  min-width: 340px;
-  max-width: 620px;
+  flex: none;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+.col-resizer {
+  flex: none;
+  width: 7px;
+  position: relative;
+  z-index: 5;
+  cursor: col-resize;
+}
+
+.col-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 1px;
+  background: var(--ds-border);
+  transition: background-color 0.16s ease;
+}
+
+.col-resizer:hover::before,
+.col-resizer.dragging::before {
+  background: var(--ds-primary);
 }
 
 .chat-head {
@@ -415,7 +437,6 @@ async function handleUndoMessage(messageId: string) {
   height: 56px;
   padding: 0 14px 0 22px;
   border-bottom: 1px solid var(--ds-border);
-  border-right: 1px solid var(--ds-border);
   background: var(--ds-surface);
 }
 

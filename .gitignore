@@ -1,0 +1,5 @@
+# 编辑器 / 工具产物
+.DS_Store
+.zcode/
+
+# 子项目各自有独立的 .gitignore（见 api/.gitignore、web/.gitignore）

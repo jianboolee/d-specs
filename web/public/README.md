@@ -26,7 +26,10 @@ web/public/logo.png
   - `web/index.html` 里的 `<link rel="icon">`
   - `web/src/components/BrandMark.vue` 里的 `LOGO_SRC`
 - **文件不存在时**会自动退回「配」字方块，不会显示裂图。
-  也就是说：**目前浏览器控制台会有一条 `/logo.png` 的 404，放上文件后就消失了。**
+  注意 dev server 对未命中的路径会回落到 `index.html`，所以此时
+  `/logo.png` 返回的是 **200 + `Content-Type: text/html`** 而不是 404 ——
+  浏览器解码失败会触发 `<img>` 的 `error`，仍然会正确退回字块。
+  排查「logo 没显示」时**看 Content-Type，不要看状态码**，200 不代表图片被拿到了。
 - **建议尺寸**：正方形，512×512 或更大。显示时会按容器大小等比缩放（`object-fit: contain`）。
 - **背景**：用图片时容器背景是透明的，所以 logo 自带底色或做成透明底都可以。
   如果读起来在深色模式下看不清，改 `BrandMark.vue` 里的 `.brand-mark` 样式即可。
