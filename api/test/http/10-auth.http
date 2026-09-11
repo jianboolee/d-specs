@@ -1,0 +1,107 @@
+# @name auth
+# @description 认证：注册 / 登录 / 当前用户
+#
+# 测试账号由 make http-sync 创建并写入 token。
+# 语法提示：断言的值不要加引号；`js` 断言只支持 `==`；
+# 且裸真值断言对 undefined 也判为通过，必须写成 `!= undefined`。
+
+### 注册
+# 重复执行会返回 409（邮箱已被注册），属于预期，故不断言状态码
+# @name register
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "demo12345",
+  "name": "测试账号"
+}
+
+### 登录
+# @name login
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "demo12345"
+}
+
+?? status == 200
+?? body code == 0
+?? js response.parsedBody.data.token != undefined
+?? js response.parsedBody.data.expires_at != undefined
+?? js response.parsedBody.data.user.id != undefined
+?? js response.parsedBody.data.user.email != undefined
+
+### 当前用户（需登录）
+GET {{baseUrl}}/api/v1/me
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? body code == 0
+?? js response.parsedBody.data.id != undefined
+?? js response.parsedBody.data.email != undefined
+
+### 未登录访问 /me —— 应 401
+GET {{baseUrl}}/api/v1/me
+
+?? status == 401
+?? body code == 401
+?? body message == 请先登录
+
+### 无效 Token —— 应 401
+GET {{baseUrl}}/api/v1/me
+Authorization: Bearer not-a-real-token
+
+?? status == 401
+?? body message == 登录已过期，请重新登录
+
+### 密码错误 —— 应 401
+# 邮箱不存在与密码错误返回同一提示，避免账号枚举
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{email}}",
+  "password": "definitely-wrong-password"
+}
+
+?? status == 401
+?? body message == 邮箱或密码不正确
+
+### 密码过短 —— 应 400，且提示为中文
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "someone-new@dspecs.dev",
+  "password": "123"
+}
+
+?? status == 400
+?? body message == 密码长度不能少于 8
+
+### 邮箱格式非法 —— 应 400，且提示为中文
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "not-an-email",
+  "password": "demo12345"
+}
+
+?? status == 400
+?? body message == 邮箱格式不正确
+
+### 邮箱大小写不敏感 —— 应 200
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "DEMO@DSPECS.DEV",
+  "password": "demo12345"
+}
+
+?? status == 200
+?? body code == 0

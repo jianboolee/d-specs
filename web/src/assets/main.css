@@ -1,0 +1,153 @@
+/* ==================== 设计令牌 ==================== */
+
+:root {
+  --ds-bg: #f7f8fa;
+  --ds-surface: #ffffff;
+  --ds-surface-muted: #f2f3f7;
+  --ds-border: #e6e8ee;
+  --ds-border-strong: #d8dbe4;
+
+  --ds-text: #1a1d24;
+  --ds-text-secondary: #5c6270;
+  --ds-text-tertiary: #9299a6;
+
+  --ds-primary: #5b5fef;
+  --ds-primary-soft: rgba(91, 95, 239, 0.1);
+  --ds-highlight: rgba(245, 166, 35, 0.18);
+
+  --ds-sidebar-width: 248px;
+  --ds-canvas-width: 46%;
+  --ds-radius: 10px;
+  --ds-radius-lg: 14px;
+}
+
+html[data-theme='dark'] {
+  --ds-bg: #14161c;
+  --ds-surface: #1b1e26;
+  --ds-surface-muted: #22262f;
+  --ds-border: #2a2f3a;
+  --ds-border-strong: #363c48;
+
+  --ds-text: #e8eaf0;
+  --ds-text-secondary: #a2a9b8;
+  --ds-text-tertiary: #767e8d;
+
+  --ds-primary: #7b7ff5;
+  --ds-primary-soft: rgba(123, 127, 245, 0.16);
+  --ds-highlight: rgba(245, 166, 35, 0.22);
+}
+
+/* ==================== 基础重置 ==================== */
+
+* {
+  box-sizing: border-box;
+}
+
+/*
+ * 应用是一个「固定视口」的壳：页面本身永不滚动，
+ * 只有内部的会话列表 / 消息区 / 表格区各自滚动。
+ * 这是 DeepSeek Chat 一类产品的做法，也是三栏布局能各自滚动的前提。
+ */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+/*
+ * naive-ui 的 ConfigProvider 默认会渲染一层 <div class="n-config-provider">。
+ * 少了这条，height:100% 的链条会在这里断掉 —— .shell 的 100% 会解析成 auto，
+ * 整条 flex 链塌成内容高度，表现就是「页面没铺满视口、内部容器滚不动」。
+ *
+ * 其它几个 Provider（LoadingBar / Message / Dialog）渲染的是 Fragment，
+ * 不产生包裹元素，所以只需要处理这一个。
+ */
+.n-config-provider {
+  height: 100%;
+}
+
+body {
+  background: var(--ds-bg);
+  color: var(--ds-text);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==================== 滚动条 ==================== */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--ds-border-strong);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ds-text-tertiary);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ==================== 通用工具类 ==================== */
+
+/*
+ * 滚动区域。
+ *
+ * min-height: 0 是必需的：flex 子项默认 min-height: auto，会被内容撑开，
+ * 于是永远不触发滚动条，而是把父容器顶出视口。
+ */
+.ds-scroll-y {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+
+/* 固定视口壳：内部各行各自滚动，页面本身不动 */
+.ds-app-shell {
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 纵向 flex 容器，需要让子项能收缩才能出现内部滚动 */
+.ds-column {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ds-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* AI 改动落地后短暂高亮，2 秒淡出，帮助用户定位变化 */
+@keyframes ds-flash {
+  0% {
+    background-color: var(--ds-highlight);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.ds-flash {
+  animation: ds-flash 2s ease-out;
+}

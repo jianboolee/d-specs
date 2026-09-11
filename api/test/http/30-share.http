@@ -1,0 +1,119 @@
+# @name share
+# @description 分享：开启 / 公开读取 / 关闭
+#
+# 注意 httpYac 的坑详见 test/README.md。
+
+### 建表用于分享测试
+# @name createTable
+POST {{baseUrl}}/api/v1/tables
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "分享测试表" }
+
+?? status == 201
+
+{{
+  exports.shareTableId = response.parsedBody.data.table.id;
+}}
+
+### 写入一条参数
+POST {{baseUrl}}/api/v1/tables/{{shareTableId}}/apply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "base_revision": 0,
+  "ops": [
+    { "op": "add_item", "item": { "name": "电池容量", "value": "5000", "unit": "mAh", "value_type": "number", "group_name": "续航" } }
+  ]
+}
+
+?? status == 200
+
+### 分享状态：未开启时应返回 200 + enabled=false，而不是 404
+GET {{baseUrl}}/api/v1/tables/{{shareTableId}}/share
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.enabled == false
+
+### 开启分享
+# @name enableShare
+POST {{baseUrl}}/api/v1/tables/{{shareTableId}}/share
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.enabled == true
+?? js response.parsedBody.data.token != undefined
+
+{{
+  exports.shareToken = response.parsedBody.data.token;
+}}
+
+### 表的可见性应变为 link
+GET {{baseUrl}}/api/v1/tables/{{shareTableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? body data.table.visibility == link
+
+### 公开读取：无需任何鉴权
+GET {{baseUrl}}/api/v1/public/specs/{{shareToken}}
+
+?? status == 200
+?? js response.parsedBody.data.title == 分享测试表
+?? js response.parsedBody.data.groups.length == 1
+?? js response.parsedBody.data.groups[0].items.length == 1
+?? js response.parsedBody.data.groups[0].items[0].name == 电池容量
+
+### 公开响应不应暴露表 id 与参数项 id
+GET {{baseUrl}}/api/v1/public/specs/{{shareToken}}
+
+?? status == 200
+?? js response.parsedBody.data.id == undefined
+?? js response.parsedBody.data.groups[0].items[0].id == undefined
+
+### 无效 token —— 应 404
+GET {{baseUrl}}/api/v1/public/specs/definitely-not-a-real-token
+
+?? status == 404
+
+### 再次开启分享应复用同一个 token
+POST {{baseUrl}}/api/v1/tables/{{shareTableId}}/share
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.token == {{shareToken}}
+
+### 关闭分享
+DELETE {{baseUrl}}/api/v1/tables/{{shareTableId}}/share
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.enabled == false
+
+### 关闭后公开链接立即失效
+GET {{baseUrl}}/api/v1/public/specs/{{shareToken}}
+
+?? status == 404
+
+### 可见性回到 private
+GET {{baseUrl}}/api/v1/tables/{{shareTableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? body data.table.visibility == private
+
+### 重新开启：老链接应复活且 token 不变
+POST {{baseUrl}}/api/v1/tables/{{shareTableId}}/share
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.token == {{shareToken}}
+
+### 清理
+DELETE {{baseUrl}}/api/v1/tables/{{shareTableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200

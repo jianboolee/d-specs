@@ -1,0 +1,28 @@
+package chat
+
+import (
+	"github.com/donktech/d-specs/internal/deps"
+	"github.com/donktech/d-specs/internal/middleware"
+	"github.com/donktech/d-specs/internal/modules/spec"
+
+	"github.com/gin-gonic/gin"
+)
+
+// Register 注册对话相关路由。全部需要登录。
+//
+// specSvc 由调用方传入而不是在这里另建一个：AI 变更与手工变更必须共用
+// 同一个 spec.Service，否则两边的校验与版本语义会各走一套。
+func Register(rg *gin.RouterGroup, d *deps.Deps, specSvc *spec.Service) {
+	repo := NewRepository(d.DB)
+	svc := NewService(repo, specSvc, d.LLM, d.Config)
+	h := NewHandler(svc)
+
+	authed := rg.Group("")
+	authed.Use(middleware.AuthRequired(d.JWT))
+
+	// SSE：流式返回整轮对话
+	authed.POST("/tables/:id/chat", h.Stream)
+
+	authed.GET("/tables/:id/sessions", h.Sessions)
+	authed.GET("/sessions/:sid/messages", h.Messages)
+}

@@ -1,0 +1,15 @@
+.env
+bin/
+tmp/
+tmp/build-errors.log
+*.exe
+*.test
+vendor/
+.DS_Store
+node_modules/
+http-client.private.env.json
+.vscode/
+
+# 项目内构建缓存：默认的 ~/Library/Caches 与 ~/.npm 在受限环境下无写权限
+.gocache/
+.npm-cache/

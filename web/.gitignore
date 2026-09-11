@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+.DS_Store
+.vite/
+.env
+.env.*
+!.env.example
+
+# 项目内 npm 缓存（默认的 ~/.npm 在受限环境下无写权限）
+.npm-cache/

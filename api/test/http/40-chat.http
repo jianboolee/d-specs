@@ -1,0 +1,111 @@
+# @name chat
+# @description AI 对话（SSE 流式）
+#
+# 这个文件会真实调用 DeepSeek，耗时较长（每轮约 3~8 秒）。
+# httpYac 会等到流结束再断言响应体，因此把整段 SSE 文本当字符串检查。
+#
+# 注意 httpYac 的坑详见 test/README.md。
+
+### 建一张空表
+# @name createTable
+POST {{baseUrl}}/api/v1/tables
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "对话接口测试" }
+
+?? status == 201
+
+{{
+  exports.chatTableId = response.parsedBody.data.table.id;
+}}
+
+### 对话：让 AI 建参数
+# @name firstChat
+POST {{baseUrl}}/api/v1/tables/{{chatTableId}}/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "message": "加一个参数：电池容量 5000mAh，分组叫续航" }
+
+?? status == 200
+?? js response.body.includes('event: start')
+?? js response.body.includes('event: done')
+
+### 改动应真的落库
+GET {{baseUrl}}/api/v1/tables/{{chatTableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.items.length == 1
+?? js response.parsedBody.data.items[0].name == 电池容量
+?? js response.parsedBody.data.items[0].value == 5000
+?? js response.parsedBody.data.items[0].unit == mAh
+
+### 会话应被记录，且可续接多轮
+# @name sessions
+GET {{baseUrl}}/api/v1/tables/{{chatTableId}}/sessions
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.length == 1
+
+{{
+  exports.chatSessionId = response.parsedBody.data[0].id;
+}}
+
+### 第二轮：带上 session 延续上下文
+POST {{baseUrl}}/api/v1/tables/{{chatTableId}}/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "session_id": "{{chatSessionId}}", "message": "再改成 4800mAh" }
+
+?? status == 200
+?? js response.body.includes('event: done')
+
+### 第二轮改动也应落库
+GET {{baseUrl}}/api/v1/tables/{{chatTableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.items[0].value == 4800
+
+### 只读提问不应改数据
+GET {{baseUrl}}/api/v1/tables/{{chatTableId}}/revisions
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.length == 3
+
+### 会话消息应被记录（含两轮问答）
+GET {{baseUrl}}/api/v1/sessions/{{chatSessionId}}/messages
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.length == 4
+
+### 不存在的表 —— 应在建立流之前就以 JSON 返回 404
+POST {{baseUrl}}/api/v1/tables/not-a-real-table/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "message": "你好" }
+
+?? status == 404
+?? body code == 404
+
+### 空消息 —— 应 400
+POST {{baseUrl}}/api/v1/tables/{{chatTableId}}/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "message": "   " }
+
+?? status == 400
+
+### 清理
+DELETE {{baseUrl}}/api/v1/tables/{{chatTableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200

@@ -1,0 +1,209 @@
+# @name tables
+# @description 参数表：CRUD / 变更 / 版本 / 复制
+#
+# 注意 httpYac 的坑（详见 test/README.md）：
+#   - 断言的值不要加引号
+#   - `js` 断言只支持 `==`
+#   - 裸真值断言对 undefined 也通过，必须写 `!= undefined`
+
+### 建表
+# @name createTable
+POST {{baseUrl}}/api/v1/tables
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "接口测试手机 A1",
+  "description": "httpYac 用例",
+  "industry": "消费电子"
+}
+
+?? status == 201
+?? body code == 0
+?? js response.parsedBody.data.table.id != undefined
+?? js response.parsedBody.data.table.current_revision == 0
+
+{{
+  exports.tableId = response.parsedBody.data.table.id;
+}}
+
+### 列表应包含刚建的表
+GET {{baseUrl}}/api/v1/tables?keyword=接口测试
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.total != undefined
+
+### 详情：新表应是空的
+GET {{baseUrl}}/api/v1/tables/{{tableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.items != undefined
+?? js response.parsedBody.data.items.length == 0
+
+### 应用变更：新增 3 个参数
+# 数值与单位写在 value 里也应被自动拆分
+POST {{baseUrl}}/api/v1/tables/{{tableId}}/apply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "base_revision": 0,
+  "source": "user",
+  "summary": "初始化参数",
+  "ops": [
+    { "op": "add_item", "item": { "name": "电池容量", "value": "5000mAh", "value_type": "number", "group_name": "续航" } },
+    { "op": "add_item", "item": { "name": "充电功率", "value": "45", "unit": "W", "value_type": "number", "group_name": "续航" } },
+    { "op": "add_item", "item": { "name": "无线充电", "value": "支持", "value_type": "bool", "group_name": "续航" } }
+  ]
+}
+
+?? status == 200
+?? js response.parsedBody.data.revision == 1
+?? js response.parsedBody.data.changes.length == 3
+
+### 详情：应含 3 项且单位已拆分
+GET {{baseUrl}}/api/v1/tables/{{tableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.items.length == 3
+?? js response.parsedBody.data.groups.length == 1
+
+### 版本列表：应有 r1 与 r0
+GET {{baseUrl}}/api/v1/tables/{{tableId}}/revisions
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.length == 2
+?? js response.parsedBody.data[0].revision == 1
+
+### 乐观锁：过期的 base_revision —— 应 409
+POST {{baseUrl}}/api/v1/tables/{{tableId}}/apply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "base_revision": 0,
+  "ops": [{ "op": "add_item", "item": { "name": "脏数据", "value": "x" } }]
+}
+
+?? status == 409
+?? body code == 409
+
+### ops 校验失败 —— 应 422 且提示中文
+POST {{baseUrl}}/api/v1/tables/{{tableId}}/apply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "base_revision": 1,
+  "ops": [{ "op": "update_item", "name": "不存在的参数", "patch": { "value": "1" } }]
+}
+
+?? status == 422
+?? body code == 422
+
+### 同分组重名 —— 应 422
+POST {{baseUrl}}/api/v1/tables/{{tableId}}/apply
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "base_revision": 1,
+  "ops": [{ "op": "add_item", "item": { "name": "电池容量", "value": "1", "group_name": "续航" } }]
+}
+
+?? status == 422
+
+### 改标题
+PATCH {{baseUrl}}/api/v1/tables/{{tableId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "接口测试手机 A1（改名）" }
+
+?? status == 200
+?? body data.title == 接口测试手机 A1（改名）
+
+### 空标题 —— 应 400
+PATCH {{baseUrl}}/api/v1/tables/{{tableId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "   " }
+
+?? status == 400
+?? body message == 参数表标题不能为空
+
+### 复制表
+# @name duplicateTable
+POST {{baseUrl}}/api/v1/tables/{{tableId}}/duplicate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "title": "接口测试手机 A2" }
+
+?? status == 201
+?? js response.parsedBody.data.table.current_revision == 0
+?? js response.parsedBody.data.items.length == 3
+
+{{
+  exports.copyId = response.parsedBody.data.table.id;
+}}
+
+### 副本参数项 id 应与源表不同
+GET {{baseUrl}}/api/v1/tables/{{copyId}}
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.items.length == 3
+
+### 恢复到 r0 —— 应产生新版本 r2
+POST {{baseUrl}}/api/v1/tables/{{tableId}}/restore
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "revision": 0 }
+
+?? status == 200
+?? js response.parsedBody.data.revision == 2
+
+### 恢复后应为空表
+GET {{baseUrl}}/api/v1/tables/{{tableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.items.length == 0
+
+### 再恢复到 r1 —— 等于重做
+POST {{baseUrl}}/api/v1/tables/{{tableId}}/restore
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "revision": 1 }
+
+?? status == 200
+?? js response.parsedBody.data.revision == 3
+
+### 恢复到不存在的版本 —— 应 404
+POST {{baseUrl}}/api/v1/tables/{{tableId}}/restore
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "revision": 999 }
+
+?? status == 404
+
+### 清理：删除测试表
+DELETE {{baseUrl}}/api/v1/tables/{{copyId}}
+Authorization: Bearer {{token}}
+
+?? status == 200
+
+### 清理：删除测试表
+DELETE {{baseUrl}}/api/v1/tables/{{tableId}}
+Authorization: Bearer {{token}}
+
+?? status == 200

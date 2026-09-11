@@ -1,0 +1,21 @@
+# @name health
+# @description 服务健康检查（无需登录）
+#
+# 语法提示：值不要加引号（`== 请先登录` 而不是 `== '请先登录'`）；
+# `js` 断言只支持 `==`，`===` 会被解析器截断；
+# 且裸真值断言对 undefined 也判为通过，必须写成 `!= undefined`。
+
+### 健康检查
+# data.llm 表示 DeepSeek 是否已配置
+GET {{baseUrl}}/health
+?? status == 200
+?? body code == 0
+?? body data.status == ok
+
+### 就绪检查（PostgreSQL / Redis / LLM）
+# ready 为 false 时返回 503；这里只断言 checks 结构齐全，不硬编码依赖状态
+GET {{baseUrl}}/health/ready
+?? js response.parsedBody.checks != undefined
+?? js response.parsedBody.checks.postgres != undefined
+?? js response.parsedBody.checks.redis != undefined
+?? js response.parsedBody.checks.llm != undefined
