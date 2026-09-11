@@ -35,7 +35,7 @@ export interface UiMessage {
 
 /** 工具名的中文说明，让「正在检索参数」比裸工具名好懂 */
 const TOOL_LABELS: Record<string, string> = {
-  get_schema: '正在查看配置表结构…',
+  get_schema: '正在查看参数表结构…',
   search_items: '正在检索参数…',
   get_items: '正在读取参数…',
   count_items: '正在统计参数数量…',
@@ -141,7 +141,7 @@ export const useChatStore = defineStore('chat', () => {
 
     const spec = useSpecTableStore()
     if (!spec.table) {
-      lastError.value = '请先打开一张配置表'
+      lastError.value = '请先打开一张参数表'
       return
     }
 

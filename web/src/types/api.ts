@@ -19,7 +19,7 @@ export interface AuthPayload {
   user: UserProfile
 }
 
-// ==================== 配置表 ====================
+// ==================== 参数表 ====================
 
 /** 参数值类型 */
 export type SpecValueType = 'text' | 'number' | 'bool' | 'enum'
@@ -27,8 +27,8 @@ export type SpecValueType = 'text' | 'number' | 'bool' | 'enum'
 /**
  * 参数项。
  *
- * 一张配置表 = 一个产品的产品配置表，表内每行是一条参数项。
- * 配置表只有两列：参数名、参数值 —— 单位直接写在值里（5000mAh、8小时）。
+ * 一张参数表 = 一个产品的参数配置表，表内每行是一条参数项。
+ * 参数表只有两列：参数名、参数值 —— 单位直接写在值里（5000mAh、8小时）。
  */
 export interface SpecItem {
   id: string

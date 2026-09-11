@@ -1,5 +1,5 @@
 # @name tables
-# @description 配置表：CRUD / 变更 / 版本 / 复制
+# @description 参数表：CRUD / 变更 / 版本 / 复制
 #
 # 注意 httpYac 的坑（详见 test/README.md）：
 #   - 断言的值不要加引号
@@ -138,7 +138,7 @@ Content-Type: application/json
 { "title": "   " }
 
 ?? status == 400
-?? body message == 配置表标题不能为空
+?? body message == 参数表标题不能为空
 
 ### 复制表
 # @name duplicateTable

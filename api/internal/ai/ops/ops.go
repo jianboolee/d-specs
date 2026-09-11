@@ -1,4 +1,4 @@
-// Package ops 定义 AI 与手工编辑共用的配置表变更协议。
+// Package ops 定义 AI 与手工编辑共用的参数表变更协议。
 //
 // 设计铁律：AI 只能产出结构化操作（Op），绝不整表覆盖。
 // 所有变更 —— 无论来自 AI、用户手工操作还是模板套用 —— 都经过同一套
@@ -29,7 +29,7 @@ const (
 const (
 	// MaxOpsPerRequest 单次请求的 op 条数上限
 	MaxOpsPerRequest = 200
-	// MaxItemsPerTable 单张配置表的参数项上限
+	// MaxItemsPerTable 单张参数表的参数项上限
 	MaxItemsPerTable = 2000
 	// MaxExpandedOps 条件式 op 展开后的条数上限
 	MaxExpandedOps = 500
@@ -57,7 +57,7 @@ type Item struct {
 	SortOrder   int      `json:"sort_order"`
 }
 
-// Snapshot 一张配置表的完整状态
+// Snapshot 一张参数表的完整状态
 type Snapshot struct {
 	Title string `json:"title"`
 	Items []Item `json:"items"`

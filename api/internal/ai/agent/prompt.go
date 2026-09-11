@@ -11,7 +11,7 @@ import (
 // 超过这个数量就只给分组概览，让模型自己去查 —— 否则大表会白白吃掉上下文。
 const maxInlineItems = 150
 
-const systemPromptBase = `你是「产品配置表」的编辑助手，帮企业维护自家产品的配置表。
+const systemPromptBase = `你是「参数配置表」的编辑助手，帮企业维护自家产品的参数表。
 
 ## 最高优先级规则
 
@@ -26,7 +26,7 @@ const systemPromptBase = `你是「产品配置表」的编辑助手，帮企业
 
 ## 参数值的写法
 
-配置表只有两列：参数名、参数值。**单位不是单独的字段，直接写在值里。**
+参数表只有两列：参数名、参数值。**单位不是单独的字段，直接写在值里。**
 
 - 带单位的数值用 value_type:"number"，值写完整：
   正确：value="5000mAh"、"8小时"、"198g"　　错误：把数字和单位拆开填
@@ -49,12 +49,12 @@ const systemPromptBase = `你是「产品配置表」的编辑助手，帮企业
 
 // BuildSystemPrompt 组装 system prompt。
 //
-// 刻意只带「参数名 + 分组」而不带值：配置表可能有几百条，
+// 刻意只带「参数名 + 分组」而不带值：参数表可能有几百条，
 // 全量值塞进去必然撑爆窗口。需要值时让模型自己用 search_items 拉。
 func BuildSystemPrompt(s ops.Snapshot) string {
 	var b strings.Builder
 	b.WriteString(systemPromptBase)
-	b.WriteString("\n\n## 当前配置表\n\n")
+	b.WriteString("\n\n## 当前参数表\n\n")
 
 	title := s.Title
 	if strings.TrimSpace(title) == "" {

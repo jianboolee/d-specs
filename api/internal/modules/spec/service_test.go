@@ -75,7 +75,7 @@ func applyItems(t *testing.T, svc *Service, userID, tableID string, summary stri
 
 	table, err := svc.repo.GetTable(context.Background(), userID, tableID)
 	if err != nil {
-		t.Fatalf("读取配置表失败: %v", err)
+		t.Fatalf("读取参数表失败: %v", err)
 	}
 	base := table.CurrentRevision
 
@@ -101,7 +101,7 @@ func TestCrossUserIsolation(t *testing.T) {
 	intruder := createTestUser(t, db, "越权者")
 
 	// owner 建表并写入内容
-	created, err := svc.Create(ctx, owner, CreateRequest{Title: "owner 的手机配置表"})
+	created, err := svc.Create(ctx, owner, CreateRequest{Title: "owner 的手机参数表"})
 	if err != nil {
 		t.Fatalf("建表失败: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestCrossUserIsolation(t *testing.T) {
 		}
 		for _, item := range list.Items {
 			if item.ID == tableID {
-				t.Fatal("列表里出现了他人的配置表")
+				t.Fatal("列表里出现了他人的参数表")
 			}
 		}
 	})
@@ -193,7 +193,7 @@ func TestCrossUserIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("owner 应仍能读取自己的表: %v", err)
 		}
-		if detail.Table.Title != "owner 的手机配置表" {
+		if detail.Table.Title != "owner 的手机参数表" {
 			t.Errorf("标题被改动: %q", detail.Table.Title)
 		}
 		if len(detail.Items) != 1 {

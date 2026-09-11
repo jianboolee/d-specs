@@ -171,7 +171,7 @@ function kindLabel(kind: ChatChange['kind']) {
           v-model="draft"
           class="composer-input"
           rows="1"
-          placeholder="告诉 AI 你要怎么调整这张配置表…"
+          placeholder="告诉 AI 你要怎么调整这张参数表…"
           :disabled="disabled"
           @keydown="onKeydown"
         />

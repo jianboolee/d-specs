@@ -128,7 +128,7 @@ export const useSpecTableStore = defineStore('specTable', () => {
    * 5000 + mAh）只有服务端说了算，本地推算容易与真实状态不一致。
    */
   async function applyOps(ops: Op[], summary = '') {
-    if (!table.value) throw new ApiError('没有打开的配置表', -1, 0)
+    if (!table.value) throw new ApiError('没有打开的参数表', -1, 0)
 
     const base = table.value.current_revision
     saving.value = true

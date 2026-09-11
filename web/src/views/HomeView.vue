@@ -37,18 +37,18 @@ function goCreate() {
         <div class="mark">配</div>
 
         <h1>{{ greeting }}</h1>
-        <p class="tagline">用对话的方式，为每个产品维护一份配置表</p>
+        <p class="tagline">用对话的方式，为每个产品维护一份参数表</p>
 
         <div class="actions">
           <n-button type="primary" size="large" @click="goTables">
             <template #icon><i class="ri-file-list-3-line" /></template>
-            我的配置表
+            我的参数表
             <span v-if="tableCount > 0" class="count">{{ tableCount }}</span>
           </n-button>
 
           <n-button size="large" quaternary @click="goCreate">
             <template #icon><i class="ri-add-line" /></template>
-            新建配置表
+            新建参数表
           </n-button>
         </div>
 
@@ -130,7 +130,7 @@ function goCreate() {
   flex-wrap: wrap;
 }
 
-/* 「我的配置表」按钮上的数量角标 */
+/* 「我的参数表」按钮上的数量角标 */
 .count {
   margin-left: 7px;
   padding: 0 7px;

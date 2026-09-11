@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Register 注册配置表相关路由。全部需要登录。
+// Register 注册参数表相关路由。全部需要登录。
 //
 // 返回 Service 供其它模块复用（对话模块的 AI 变更必须走同一个 service，
 // 否则 AI 与手工变更的校验和版本语义会各走一套）。

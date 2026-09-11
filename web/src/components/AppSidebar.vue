@@ -67,17 +67,17 @@ onMounted(() => {
     <div class="sidebar-head">
       <div class="brand-mark">配</div>
       <button class="brand-name" type="button" title="返回首页" @click="router.push({ name: 'home' })">
-        产品配置表
+        参数配置表
       </button>
     </div>
 
     <button class="new-btn" type="button" @click="goCreate">
       <i class="ri-add-line" />
-      <span>新建配置表</span>
+      <span>新建参数表</span>
     </button>
 
     <div class="search">
-      <n-input v-model:value="keyword" size="small" placeholder="搜索配置表" clearable>
+      <n-input v-model:value="keyword" size="small" placeholder="搜索参数表" clearable>
         <template #prefix>
           <i class="ri-search-line" />
         </template>
@@ -102,9 +102,9 @@ onMounted(() => {
       </template>
 
       <div v-else class="list-empty">
-        <template v-if="keyword">没有匹配的配置表</template>
+        <template v-if="keyword">没有匹配的参数表</template>
         <template v-else-if="spec.listLoading">加载中…</template>
-        <template v-else>还没有配置表<br />点上方按钮创建第一张</template>
+        <template v-else>还没有参数表<br />点上方按钮创建第一张</template>
       </div>
     </div>
 

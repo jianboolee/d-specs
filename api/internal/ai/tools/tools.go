@@ -2,7 +2,7 @@
 //
 // 分工：
 //   - 只读工具（get_schema / search_items / get_items / count_items）
-//     让模型按需取数，而不是把整张表预灌进上下文 —— 配置表大了会直接撑爆窗口。
+//     让模型按需取数，而不是把整张表预灌进上下文 —— 参数表大了会直接撑爆窗口。
 //   - 唯一写工具 propose_ops
 //     模型改变数据的唯一通道，产出结构化操作交给 ops 包校验后应用。
 package tools
@@ -49,7 +49,7 @@ func Definitions() []provider.Tool {
 	return []provider.Tool{
 		provider.NewFunctionTool(
 			ToolGetSchema,
-			"获取当前配置表的结构概览：表标题、分组列表及每组参数项数量、全部参数项的名称与类型。不返回具体参数值。改动之前应先调用它来确认实际存在哪些参数名。",
+			"获取当前参数表的结构概览：表标题、分组列表及每组参数项数量、全部参数项的名称与类型。不返回具体参数值。改动之前应先调用它来确认实际存在哪些参数名。",
 			objectSchema(nil, nil),
 		),
 		provider.NewFunctionTool(
@@ -93,7 +93,7 @@ func Definitions() []provider.Tool {
 		),
 		provider.NewFunctionTool(
 			ToolProposeOps,
-			"提交对配置表的修改。这是唯一能改动数据的方式，所有变更都必须通过它提交。修改前请先确认目标参数项确实存在（用 get_schema 或 search_items 查过），不要凭猜测填参数名。",
+			"提交对参数表的修改。这是唯一能改动数据的方式，所有变更都必须通过它提交。修改前请先确认目标参数项确实存在（用 get_schema 或 search_items 查过），不要凭猜测填参数名。",
 			objectSchema(map[string]any{
 				"summary": map[string]any{
 					"type":        "string",
@@ -295,7 +295,7 @@ func (r *Registry) getSchema() schemaResult {
 	}
 
 	if len(out.Items) == 0 {
-		out.Note = "当前配置表还是空的，可以直接用 add_items 一次性建立参数项"
+		out.Note = "当前参数表还是空的，可以直接用 add_items 一次性建立参数项"
 	}
 	return out
 }

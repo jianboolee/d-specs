@@ -7,7 +7,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
-      // 首页固定是欢迎页，不再直接铺开配置表卡片
+      // 首页固定是欢迎页，不再直接铺开参数表卡片
       path: '/',
       name: 'home',
       component: () => import('@/views/HomeView.vue'),

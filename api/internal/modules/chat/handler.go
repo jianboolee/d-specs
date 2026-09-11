@@ -147,7 +147,7 @@ func describeError(err error) string {
 	case errors.Is(err, context.DeadlineExceeded):
 		return "AI 响应超时，请稍后重试"
 	case errors.Is(err, spec.ErrRevisionConflict):
-		return "配置表刚刚被其他操作改动，请重试"
+		return "参数表刚刚被其他操作改动，请重试"
 	default:
 		return "AI 处理失败：" + err.Error()
 	}

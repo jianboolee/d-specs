@@ -7,7 +7,7 @@ import (
 	"github.com/donktech/d-specs/pkg/quantity"
 )
 
-// SpecTable 配置表。一张表 = 一个产品的产品配置表。
+// SpecTable 参数表。一张表 = 一个产品的参数配置表。
 type SpecTable struct {
 	ID          string `gorm:"column:id;primaryKey"`
 	UserID      string `gorm:"column:user_id"`

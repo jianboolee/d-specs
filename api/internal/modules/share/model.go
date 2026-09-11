@@ -8,8 +8,8 @@ import (
 var (
 	// ErrShareNotFound 分享链接不存在或已关闭
 	ErrShareNotFound = errors.New("分享链接不存在或已关闭")
-	// ErrNotShared 该配置表尚未开启分享
-	ErrNotShared = errors.New("该配置表尚未开启分享")
+	// ErrNotShared 该参数表尚未开启分享
+	ErrNotShared = errors.New("该参数表尚未开启分享")
 )
 
 // ShareLink 只读分享链接
