@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import * as shareApi from '@/api/share'
+import BrandMark from '@/components/BrandMark.vue'
 import { ApiError } from '@/api/http'
 import type { PublicSpec } from '@/types/api'
 
@@ -60,7 +61,7 @@ onUnmounted(() => {
   <div class="share-page">
     <header class="share-head">
       <div class="brand">
-        <div class="brand-mark">配</div>
+        <BrandMark :size="26" />
         <span class="brand-name">参数配置表</span>
       </div>
       <span class="readonly-tag">只读分享</span>
@@ -139,17 +140,6 @@ onUnmounted(() => {
   gap: 9px;
 }
 
-.brand-mark {
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--ds-primary);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-}
 
 .brand-name {
   font-size: 14px;

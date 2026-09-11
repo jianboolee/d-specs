@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NButton, NPopover, useDialog, useMessage } from 'naive-ui'
 
@@ -27,6 +27,56 @@ const revision = computed(() => spec.table?.current_revision ?? 0)
 
 const showShare = ref(false)
 const showSessions = ref(false)
+
+/** AI 对话栏宽度：固定像素，支持拖动分隔条调整，并持久化到本地 */
+const CHAT_WIDTH_KEY = 'dspecs.chatWidth'
+const CHAT_WIDTH_MIN = 360
+const CHAT_WIDTH_MAX = 720
+const CHAT_WIDTH_DEFAULT = 440
+
+function readChatWidth(): number {
+  const n = Number(localStorage.getItem(CHAT_WIDTH_KEY))
+  if (Number.isFinite(n)) return Math.min(CHAT_WIDTH_MAX, Math.max(CHAT_WIDTH_MIN, n))
+  return CHAT_WIDTH_DEFAULT
+}
+
+const chatWidth = ref(readChatWidth())
+const resizing = ref(false)
+let resizeCleanup: (() => void) | null = null
+
+function onResizeDown(event: PointerEvent) {
+  if (event.button !== 0) return
+  resizing.value = true
+  const startX = event.clientX
+  const startWidth = chatWidth.value
+  document.body.classList.add('ds-resizing-col')
+
+  const onMove = (ev: PointerEvent) => {
+    chatWidth.value = Math.min(
+      CHAT_WIDTH_MAX,
+      Math.max(CHAT_WIDTH_MIN, startWidth + ev.clientX - startX),
+    )
+  }
+  const onUp = () => finishResize()
+  resizeCleanup = () => {
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+    window.removeEventListener('pointercancel', onUp)
+  }
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onUp)
+  window.addEventListener('pointercancel', onUp)
+}
+
+function finishResize() {
+  resizing.value = false
+  document.body.classList.remove('ds-resizing-col')
+  resizeCleanup?.()
+  resizeCleanup = null
+  localStorage.setItem(CHAT_WIDTH_KEY, String(chatWidth.value))
+}
+
+onBeforeUnmount(finishResize)
 
 /** 当前会话的状态摘要，显示在对话区头部 */
 const sessionHint = computed(() => {
@@ -196,7 +246,7 @@ async function handleUndoMessage(messageId: string) {
       <div v-if="spec.loading && !spec.table" class="loading">加载中…</div>
 
       <div v-else-if="spec.table" class="workspace">
-        <div class="chat-col">
+        <div class="chat-col" :style="{ width: chatWidth + 'px' }">
           <header class="chat-head">
             <span class="dot" :class="{ busy: chat.sending }" />
             <div class="head-text">
@@ -268,6 +318,14 @@ async function handleUndoMessage(messageId: string) {
             </template>
           </ChatPanel>
         </div>
+
+        <div
+          class="col-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          :class="{ dragging: resizing }"
+          @pointerdown="onResizeDown"
+        />
 
         <SpecCanvas
           :title="title"

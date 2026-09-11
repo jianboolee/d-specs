@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { NButton } from 'naive-ui'
 
 import AppSidebar from '@/components/AppSidebar.vue'
+import BrandMark from '@/components/BrandMark.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useSpecTableStore } from '@/stores/specTable'
 
@@ -34,7 +35,9 @@ function goCreate() {
 
     <main class="home ds-scroll-y">
       <div class="hero">
-        <div class="mark">配</div>
+        <div class="mark-wrap">
+          <BrandMark :size="60" :radius-ratio="0.3" />
+        </div>
 
         <h1>{{ greeting }}</h1>
         <p class="tagline">用对话的方式，为每个产品维护一份参数表</p>
@@ -95,17 +98,11 @@ function goCreate() {
   text-align: center;
 }
 
-.mark {
-  width: 60px;
-  height: 60px;
-  margin: 0 auto 22px;
-  display: grid;
-  place-items: center;
-  border-radius: 18px;
-  background: var(--ds-primary);
-  color: #fff;
-  font-size: 26px;
-  font-weight: 600;
+/* BrandMark 自身不负责水平居中，这里包一层 */
+.mark-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 22px;
 }
 
 .hero h1 {

@@ -7,6 +7,7 @@ import type { DropdownOption } from 'naive-ui'
 import { useAuthStore } from '@/stores/auth'
 import { useSpecTableStore } from '@/stores/specTable'
 import { useThemeMode } from '@/composables/useThemeMode'
+import BrandMark from '@/components/BrandMark.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -65,7 +66,7 @@ onMounted(() => {
 <template>
   <aside class="sidebar">
     <div class="sidebar-head">
-      <div class="brand-mark">配</div>
+      <BrandMark :size="26" />
       <button class="brand-name" type="button" title="返回首页" @click="router.push({ name: 'home' })">
         参数配置表
       </button>
@@ -150,18 +151,6 @@ onMounted(() => {
   padding: 14px 14px 10px;
 }
 
-.brand-mark {
-  width: 26px;
-  height: 26px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: var(--ds-primary);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-}
 
 .brand-name {
   flex: 1;

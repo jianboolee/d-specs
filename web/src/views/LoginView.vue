@@ -7,6 +7,7 @@ import type { FormInst, FormRules } from 'naive-ui'
 import { ApiError } from '@/api/http'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeMode } from '@/composables/useThemeMode'
+import BrandMark from '@/components/BrandMark.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -74,7 +75,7 @@ async function submit() {
 
     <div class="login-card">
       <div class="brand">
-        <div class="brand-mark">配</div>
+        <BrandMark :size="42" />
         <div class="brand-text">
           <h1>参数配置表</h1>
           <p>用对话的方式，为每个产品维护一份参数表</p>
@@ -198,18 +199,6 @@ async function submit() {
   margin-bottom: 24px;
 }
 
-.brand-mark {
-  width: 42px;
-  height: 42px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: var(--ds-primary);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 600;
-}
 
 .brand-text h1 {
   margin: 0;
