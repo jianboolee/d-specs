@@ -1,5 +1,5 @@
 .PHONY: help api-dev api-run api-build migrate migrate-down ai-check api-test web-dev web-build web-install install \
-        docker-build docker-release docker-run
+        docker-build docker-release docker-run nginx-push
 
 ## 帮助
 
@@ -16,6 +16,7 @@ help:
 	@echo "  make docker-build   构建镜像（仅本机，不推送）"
 	@echo "  make docker-release 构建并推送 $(DOCKER_IMAGE):$(DOCKER_TAG)"
 	@echo "  make docker-run     用最新镜像本地起一个容器 :8080"
+	@echo "  make nginx-push     推送 deploy/nginx/*.conf 到服务器并 reload nginx"
 	@echo ""
 
 # ---------- Docker 发布变量 ----------
@@ -73,7 +74,6 @@ web-typecheck:
 build: api-build web-build
 
 ## Docker
-
 # 本地构建，产物留在本机 docker images 里，不推送
 docker-build:
 	@echo "构建 $(DOCKER_IMAGE):$(DOCKER_TAG) ($(DOCKER_PLATFORMS))"
@@ -92,3 +92,10 @@ docker-run:
 		-e JWT_SECRET \
 		-e DEEPSEEK_API_KEY \
 		$(DOCKER_IMAGE):$(DOCKER_TAG)
+
+## Nginx
+
+# 推送 deploy/nginx 下的站点配置到服务器，备份 -> 上传 -> nginx -t -> reload，失败自动回滚
+# 覆盖目标：make nginx-push NGINX_SERVER=root@1.2.3.4 NGINX_PORT=2222
+nginx-push:
+	@SERVER=$(NGINX_SERVER) PORT=$(NGINX_PORT) deploy/nginx/upload.sh

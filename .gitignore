@@ -7,5 +7,5 @@ deploy/.env
 deploy/.env.*
 deploy/production.env
 !deploy/.env.example
-
+deploy/nginx/
 # 子项目各自有独立的 .gitignore（见 api/.gitignore、web/.gitignore）
