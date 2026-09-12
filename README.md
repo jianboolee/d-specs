@@ -67,6 +67,61 @@ cd api && make ai-check
 它会依次验证：模型列表、基础对话、tool calling 的参数正确性、
 以及「建表 / 改值 / 批量条件改动 / 只读提问」四个 Agent 全链路场景。
 
+## 构建与发布镜像
+
+发布镜像 `jianboo/d-specs` 是**全栈单镜像**：nginx 托管前端产物，并把
+`/api` 与 `/health` 反代到同容器内的 Go 服务，监听 80 端口。
+
+```bash
+make docker-build     # 只在本机构建，不推送
+make docker-release   # 构建并推送到 Docker Hub
+```
+
+tag 默认取最近的 git tag，没有 tag 时退回提交短哈希。发布某个版本时显式指定：
+
+```bash
+make docker-release DOCKER_TAG=v1.0.0
+```
+
+推送前先登录（凭据不要写进仓库）：
+
+```bash
+docker login
+```
+
+默认按 `linux/amd64` 构建（常见云服务器架构）。本机是 Apple Silicon 想本地试跑，
+用 `DOCKER_PLATFORMS=linux/arm64` 覆盖；需要同时发布两种架构时传
+`DOCKER_PLATFORMS=linux/amd64,linux/arm64`（多平台需要 buildx）。
+
+### 运行
+
+PostgreSQL 与 Redis 是**外部依赖**，通过环境变量注入（变量清单见 `api/.env.example`）。
+容器启动时默认自动执行数据库迁移，可用 `RUN_MIGRATIONS=false` 关闭：
+
+```bash
+docker run -d -p 8080:80 --name dspecs \
+  -e DATABASE_URL="postgresql://user:pass@host:5432/dspecs?sslmode=disable" \
+  -e REDIS_URL="redis://host:6379/0" \
+  -e JWT_SECRET="<openssl rand -base64 48 | tr -d '/+='>" \
+  -e DEEPSEEK_API_KEY="<key>" \
+  -e PUBLIC_URL_BASE="" \
+  jianboo/d-specs:v1.0.0
+```
+
+也可以把迁移当一次性任务单独跑（`migrate` 支持 `up` / `down N` / `version`）：
+
+```bash
+docker run --rm -e DATABASE_URL="..." jianboo/d-specs:v1.0.0 migrate up
+```
+
+本地试跑可直接 `make docker-run`（需要 `DATABASE_URL` / `REDIS_URL` / `JWT_SECRET`
+/ `DEEPSEEK_API_KEY` 已在当前 shell 环境里；从宿主机访问数据库时把 host 写成
+`host.docker.internal`）。
+
+镜像内置健康检查，直接打后端 `/health`（而非 nginx），避免把「nginx 活着、
+后端已挂」误判为健康。容器内任一时间只有一个 API 与一个 nginx 进程，任一
+意外退出都会让容器整体退出，交由编排系统重启。
+
 ## 当前进度
 
 首版已全部完成：
