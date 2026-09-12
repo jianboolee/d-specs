@@ -1,0 +1,72 @@
+# ============================================================
+# d-specs —— Portainer Stack（简化版，不托管数据库）
+#
+# 只跑应用容器，PostgreSQL 使用现有实例，通过 DATABASE_URL 直接连接。
+# 适合服务器上已有 PostgreSQL 的场景（团队惯例：连现成的生产库）。
+#
+# 与 deploy/portainer-stack.yml 的区别：
+#   本文件不含 postgres 服务，也不创建数据卷，因此不负责数据持久化。
+#
+# 部署步骤（Portainer UI）：
+#   1. Stacks → Add stack → 名称填 dspecs
+#   2. 构建方式选 Web editor，粘贴本文件
+#   3. 点「Load variables from .env file」导入 deploy/production.env
+#      （或手动逐条填下面的变量）
+#   4. Deploy the stack
+#
+# 必填变量：DATABASE_URL、JWT_SECRET
+# 其余见 deploy/production.env 的注释。
+#
+# 数据库不在 Portainer 宿主机可达范围内时，需自行保证网络连通：
+#   - 生产库是独立服务器/内网 IP：直接填该 IP 即可，无需额外配置；
+#   - 生产库是同宿主机上的另一个容器：二选一
+#       a) 给本服务加 external network，指向那个库所在的网络；
+#       b) 用 host.docker.internal（需在宿主机 5432/其它端口暴露该库）。
+# ============================================================
+
+services:
+  app:
+    image: ${DOCKER_IMAGE:-jianboo/d-specs}:${DOCKER_TAG:-latest}
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    container_name: dspecs-app
+    restart: unless-stopped
+
+    environment:
+      APP_ENV: production
+      HTTP_PORT: "8300"
+
+      # 指向现有 PostgreSQL（完整连接串，由 Portainer 环境变量注入）
+      DATABASE_URL: ${DATABASE_URL:?请设置 DATABASE_URL，例如 postgresql://user:pass@host:5432/dspecs?sslmode=disable}
+
+      JWT_SECRET: ${JWT_SECRET:?请设置 JWT_SECRET}
+      JWT_EXPIRE: ${JWT_EXPIRE:-720h}
+
+      # 留空则应用正常启动，仅 AI 对话不可用
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_TIMEOUT: ${DEEPSEEK_TIMEOUT:-120s}
+
+      AI_MAX_TOOL_ROUNDS: ${AI_MAX_TOOL_ROUNDS:-6}
+      AI_AUTO_APPLY_MAX_OPS: ${AI_AUTO_APPLY_MAX_OPS:-30}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-8192}
+      AI_TEMPERATURE: ${AI_TEMPERATURE:-0.2}
+
+      # 容器启动时自动执行数据库迁移；改为 false 则由发布流程单独执行
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+
+      # 首次部署且目标库尚未创建时设为 true，会自动 CREATE DATABASE。
+      # 建好之后改回 false（默认），避免库名写错时静默建出空库。
+      AUTO_CREATE_DB: ${AUTO_CREATE_DB:-false}
+
+      PUBLIC_URL_BASE: ${PUBLIC_URL_BASE:-}
+      TZ: ${TZ:-Asia/Shanghai}
+
+    ports:
+      - "${APP_PORT:-8080}:80"
+
+    # 让 host.docker.internal 在 Linux 上也解析到宿主机（连宿主上的库时需要）
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # 健康检查沿用镜像内置的 HEALTHCHECK（打后端 /health），此处不重复定义

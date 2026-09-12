@@ -19,10 +19,10 @@ help:
 	@echo ""
 
 # ---------- Docker 发布变量 ----------
-# 镜像仓库与 tag。用法：make docker-release DOCKER_TAG=v1.0.0
+# 镜像仓库与 tag
 DOCKER_IMAGE ?= jianboo/d-specs
-# 默认 tag 取最近的 git tag，没有 tag 时退回提交短哈希，例如 v1.2.0 / 46efb9c
-DOCKER_TAG ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+# 默认发布 latest；需要留版本号时显式覆盖：make docker-release DOCKER_TAG=v1.0.0
+DOCKER_TAG ?= latest
 # 目标架构。常见云服务器是 amd64；需要多架构时用逗号分隔，如 linux/amd64,linux/arm64
 DOCKER_PLATFORMS ?= linux/amd64
 

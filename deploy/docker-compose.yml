@@ -1,0 +1,92 @@
+# ============================================================
+# d-specs 生产部署（自建服务器 / docker compose）
+#
+#   一条命令起全栈：应用 + PostgreSQL 18
+#   用法：
+#     cp .env.example .env   # 填 POSTGRES_PASSWORD、JWT_SECRET
+#     docker compose up -d
+#
+# 镜像来自 Docker Hub（由仓库根的 `make docker-release` 构建推送）。
+# 若要在本机直接构建镜像，见下方 app.build 注释。
+# ============================================================
+
+services:
+  app:
+    image: ${DOCKER_IMAGE:-jianboo/d-specs}:${DOCKER_TAG:-latest}
+    # 想在服务器上源码构建时，改用下面两行并去掉上面的 image：
+    # build:
+    #   context: ..
+    container_name: dspecs-app
+    restart: unless-stopped
+
+    # 生产模式下数据库连不上应用会直接退出，所以必须等它健康后再启动。
+    # 否则迁移会失败、容器反复重启。
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      APP_ENV: production
+      HTTP_PORT: "8300"
+
+      # 对外 URL 前缀。与应用同域时留空。
+      PUBLIC_URL_BASE: ${PUBLIC_URL_BASE:-}
+
+      # 库名/用户/端口由下面 postgres 服务定义，这里按服务名拼接，无需手写整条 URL。
+      # 注意：密码若含 @ : / ? # 等字符需先做 URL 编码，否则会解析失败。
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dspecs}:${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-dspecs}?sslmode=disable
+
+      JWT_SECRET: ${JWT_SECRET:?请在 .env 中设置 JWT_SECRET（openssl rand -base64 48 | tr -d '/+='）}
+      JWT_EXPIRE: ${JWT_EXPIRE:-720h}
+
+      # 留空则应用正常启动，但 AI 对话不可用（后端会打印「DeepSeek 未配置」）
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_TIMEOUT: ${DEEPSEEK_TIMEOUT:-120s}
+
+      AI_MAX_TOOL_ROUNDS: ${AI_MAX_TOOL_ROUNDS:-6}
+      AI_AUTO_APPLY_MAX_OPS: ${AI_AUTO_APPLY_MAX_OPS:-30}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-8192}
+      AI_TEMPERATURE: ${AI_TEMPERATURE:-0.2}
+
+      # 容器启动时自动执行数据库迁移；设为 false 可改由发布流程单独跑
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+
+      # 首次部署且目标库尚未创建时设为 true，会自动 CREATE DATABASE
+      # （本方案由本栈托管 postgres，POSTGRES_DB 已建好，通常无需开启）
+      AUTO_CREATE_DB: ${AUTO_CREATE_DB:-false}
+
+      TZ: ${TZ:-Asia/Shanghai}
+
+    ports:
+      - "${APP_PORT:-8080}:80"
+
+    # 镜像内已定义 HEALTHCHECK（打后端 /health），这里不再重复
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: dspecs-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dspecs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-dspecs}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      # Postgres 18 起数据目录是 /var/lib/postgresql/18/docker，
+      # 镜像声明的卷因此是父目录 /var/lib/postgresql。
+      # 挂成旧的 /var/lib/postgresql/data 会导致数据写进容器层、重启即丢。
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # 默认不对外暴露数据库端口；确需从宿主机直连时再打开
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+volumes:
+  postgres_data:

@@ -2,4 +2,10 @@
 .DS_Store
 .zcode/
 
+# 部署密钥：deploy/.env 与 deploy/production.env 含数据库密码与 JWT 密钥，绝不入库
+deploy/.env
+deploy/.env.*
+deploy/production.env
+!deploy/.env.example
+
 # 子项目各自有独立的 .gitignore（见 api/.gitignore、web/.gitignore）

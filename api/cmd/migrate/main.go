@@ -22,6 +22,10 @@ type migrationFile struct {
 	Path    string
 }
 
+// migrationLockKey 是 advisory lock 的固定标识，取 "dspecs" 的字节值，
+// 保证同一实例上不同项目的迁移互不干扰。
+const migrationLockKey int64 = 0x647370656373
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -42,6 +46,17 @@ func run() error {
 	}
 
 	ctx := context.Background()
+
+	// 首次部署到「实例已存在、库还没建」的 PostgreSQL 时，先自动建库。
+	// 默认关闭（AUTO_CREATE_DB=true 才启用），避免库名写错时静默建出空库。
+	if cfg.AutoCreateDB {
+		createCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+		if err := database.EnsureDatabaseExists(createCtx, cfg.DatabaseURL); err != nil {
+			return fmt.Errorf("ensure database: %w", err)
+		}
+	}
+
 	db, err := database.NewGormDB(ctx, cfg.DatabaseURL, false)
 	if err != nil {
 		return fmt.Errorf("connect database: %w", err)
@@ -50,6 +65,22 @@ func run() error {
 	sqlDB, err := db.DB()
 	if err == nil {
 		defer sqlDB.Close()
+	}
+
+	// 串行化迁移：多副本同时启动（或滚动更新新旧容器交叠）时，
+	// PostgreSQL 的 CREATE TABLE IF NOT EXISTS 检查与创建并非原子，
+	// 并发执行会报 pg_type_typname_nsp_index 唯一冲突并让容器反复重启。
+	// 这里用会话级 advisory lock 把同一库上的迁移串起来。
+	if sqlDB != nil {
+		conn, err := sqlDB.Conn(ctx)
+		if err != nil {
+			return fmt.Errorf("acquire migration lock conn: %w", err)
+		}
+		// 连接关闭即释放锁，无需显式 unlock
+		defer conn.Close()
+		if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", migrationLockKey); err != nil {
+			return fmt.Errorf("acquire migration lock: %w", err)
+		}
 	}
 
 	if err := ensureMigrationsTable(db); err != nil {

@@ -38,7 +38,13 @@ type Config struct {
 	DatabaseURL   string
 	JWTSecret     string
 	JWTExpire     time.Duration
-	AI            AIConfig
+
+	// AutoCreateDB 运行迁移前自动创建 DATABASE_URL 指向的库。
+	// 仅用于首次部署（实例存在但库还没建）；默认关闭，避免库名写错时
+	// 静默创建一个空库、让应用带着空白数据跑起来。
+	AutoCreateDB bool
+
+	AI AIConfig
 }
 
 func Load() (*Config, error) {
@@ -52,6 +58,8 @@ func Load() (*Config, error) {
 	viper.SetDefault("HTTP_PORT", "8300")
 	viper.SetDefault("PUBLIC_URL_BASE", "")
 	viper.SetDefault("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/dspecs?sslmode=disable")
+	// 首次部署时设为 true 可自动建库，之后建议改回 false
+	viper.SetDefault("AUTO_CREATE_DB", false)
 	viper.SetDefault("JWT_SECRET", "change-me-in-production")
 	viper.SetDefault("JWT_EXPIRE", "720h")
 
@@ -72,6 +80,7 @@ func Load() (*Config, error) {
 		HTTPPort:      strings.TrimSpace(viper.GetString("HTTP_PORT")),
 		PublicURLBase: strings.TrimRight(strings.TrimSpace(viper.GetString("PUBLIC_URL_BASE")), "/"),
 		DatabaseURL:   strings.TrimSpace(viper.GetString("DATABASE_URL")),
+		AutoCreateDB:  viper.GetBool("AUTO_CREATE_DB"),
 		JWTSecret:     viper.GetString("JWT_SECRET"),
 		JWTExpire:     duration(viper.GetString("JWT_EXPIRE"), 30*24*time.Hour),
 		AI: AIConfig{

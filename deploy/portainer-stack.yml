@@ -1,0 +1,88 @@
+# ============================================================
+# d-specs —— Portainer Stack 部署文件
+#
+# 与 deploy/docker-compose.yml 的区别：
+#   1. 只拉取镜像，不构建（Portainer 无法从粘贴的栈文件构建镜像）
+#   2. 不读 .env 文件，密钥走 Portainer 的「环境变量」面板
+#   3. 不设 container_name，交由 Portainer 命名，避免多栈重名冲突
+#
+# 部署步骤（Portainer UI）：
+#   1. Stacks → Add stack → 名称填 dspecs
+#   2. 构建方式选 Web editor，把本文件全文粘进去
+#   3. 在 Environment variables 面板添加（必填）：
+#        POSTGRES_PASSWORD  数据库密码（建议只用字母数字）
+#        JWT_SECRET         openssl rand -base64 48 | tr -d '/+='
+#      可选：DEEPSEEK_API_KEY、DOCKER_TAG、APP_PORT、TZ
+#   4. Deploy the stack
+#
+# 未在面板提供时，POSTGRES_PASSWORD / JWT_SECRET 会让部署直接失败并报错，
+# 这是有意为之：避免用默认弱密钥把服务跑起来。
+#
+# 若不想由本栈托管数据库（例如已有独立的 postgres 栈），
+# 见文件末尾「接外部数据库」的注释片段。
+# ============================================================
+
+services:
+  app:
+    image: ${DOCKER_IMAGE:-jianboo/d-specs}:${DOCKER_TAG:-latest}
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      APP_ENV: production
+      HTTP_PORT: "8300"
+      PUBLIC_URL_BASE: ${PUBLIC_URL_BASE:-}
+
+      DATABASE_URL: postgresql://${POSTGRES_USER:-dspecs}:${POSTGRES_PASSWORD:?请在 Portainer 环境变量面板设置 POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-dspecs}?sslmode=disable
+
+      JWT_SECRET: ${JWT_SECRET:?请在 Portainer 环境变量面板设置 JWT_SECRET}
+      JWT_EXPIRE: ${JWT_EXPIRE:-720h}
+
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
+      DEEPSEEK_TIMEOUT: ${DEEPSEEK_TIMEOUT:-120s}
+
+      AI_MAX_TOOL_ROUNDS: ${AI_MAX_TOOL_ROUNDS:-6}
+      AI_AUTO_APPLY_MAX_OPS: ${AI_AUTO_APPLY_MAX_OPS:-30}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-8192}
+      AI_TEMPERATURE: ${AI_TEMPERATURE:-0.2}
+
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+
+      # 本方案由本栈托管 postgres，POSTGRES_DB 会自动建好，通常无需开启
+      AUTO_CREATE_DB: ${AUTO_CREATE_DB:-false}
+      TZ: ${TZ:-Asia/Shanghai}
+
+    ports:
+      - "${APP_PORT:-8080}:80"
+
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dspecs}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 Portainer 环境变量面板设置 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-dspecs}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      # Postgres 18 的数据目录是 /var/lib/postgresql/18/docker，
+      # 因此卷要挂在父目录 /var/lib/postgresql。
+      # 若挂成 /var/lib/postgresql/data，数据会落在容器层，删容器即丢。
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  postgres_data:
+
+# 不想由本栈托管数据库时，用 deploy/portainer-stack-external-db.yml
+# （配 deploy/production.env），只跑应用并连现有 PostgreSQL。
+
