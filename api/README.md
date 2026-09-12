@@ -41,7 +41,6 @@ internal/
   contextx/   context 透传（当前登录用户等）
   infrastructure/
     auth/     JWT 签发与校验
-    cache/    Redis
     database/ GORM + PostgreSQL
     idgen/    实体 ID（UUID v7）与分享 token 生成
     logger/   slog

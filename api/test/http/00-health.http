@@ -12,10 +12,9 @@ GET {{baseUrl}}/health
 ?? body code == 0
 ?? body data.status == ok
 
-### 就绪检查（PostgreSQL / Redis / LLM）
+### 就绪检查（PostgreSQL / LLM）
 # ready 为 false 时返回 503；这里只断言 checks 结构齐全，不硬编码依赖状态
 GET {{baseUrl}}/health/ready
 ?? js response.parsedBody.checks != undefined
 ?? js response.parsedBody.checks.postgres != undefined
-?? js response.parsedBody.checks.redis != undefined
 ?? js response.parsedBody.checks.llm != undefined

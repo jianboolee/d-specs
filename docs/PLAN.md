@@ -358,11 +358,17 @@ event: done         {"usage":{"prompt":1200,"completion":300}}
 | Markdown | markdown-it + shiki | Phase 2 渲染 AI 回复 |
 | SSE | `@microsoft/fetch-event-source` | 原生 EventSource 不支持 POST + header |
 
-后端：Go 1.25 / Gin / GORM + pgx / PostgreSQL 18 / Redis。
+后端：Go 1.25 / Gin / GORM + pgx / PostgreSQL 18。
 
 > **落地时的调整**：规划早期拟用 Tailwind + TanStack Table，实际改为对齐团队既有栈。
 > 理由是 `d-ticket/web` 已经用 naive-ui + SCSS，引入第二套样式范式对长期维护不利；
 > 而参数表的列是固定的，也不构成对 headless 表格库的需求。
+>
+> **Redis 已移除**：原规划里 Redis 只用于占位，实际没有任何读写——认证走 JWT
+> 无状态（无服务端会话），对话历史与参数表都落在 PostgreSQL。它唯一的作用是
+> 启动时 Ping 一次并出现在 `/health/ready` 里，却让生产环境多了一个致命依赖
+> （连不上则应用拒绝启动）。既然没有功能依赖它，就一并去掉了；将来真需要
+> 缓存、限流或 SSE 会话状态时再引回。
 
 ### 端口与依赖
 
@@ -371,7 +377,6 @@ event: done         {"usage":{"prompt":1200,"completion":300}}
 | 后端 | `:8300` |
 | 前端 dev | `:5173`（Vite 代理 `/api` → 8300） |
 | PostgreSQL | 复用 `~/Sites/docker/postgres18` 共享实例，库名 `dspecs` |
-| Redis | 复用共享实例，`db0` |
 
 ### 目录结构
 

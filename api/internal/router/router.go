@@ -41,18 +41,6 @@ func Setup(engine *gin.Engine, d *deps.Deps) {
 			ready = false
 		}
 
-		if d.Redis != nil {
-			if err := d.Redis.Ping(c.Request.Context()).Err(); err != nil {
-				ready = false
-				checks["redis"] = err.Error()
-			} else {
-				checks["redis"] = "ok"
-			}
-		} else {
-			checks["redis"] = "unavailable"
-			ready = false
-		}
-
 		if d.LLM != nil {
 			checks["llm"] = d.LLM.Name() + ":" + d.LLM.Model()
 		} else {

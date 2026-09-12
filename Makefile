@@ -85,11 +85,10 @@ docker-release:
 	docker build --platform $(DOCKER_PLATFORMS) -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 	docker push $(DOCKER_IMAGE):$(DOCKER_TAG)
 
-# 本地试跑。数据库/Redis 需另行可达（默认连宿主机）
+# 本地试跑。数据库需另行可达（默认连宿主机）
 docker-run:
 	docker run --rm -p 8080:80 \
 		-e DATABASE_URL \
-		-e REDIS_URL \
 		-e JWT_SECRET \
 		-e DEEPSEEK_API_KEY \
 		$(DOCKER_IMAGE):$(DOCKER_TAG)
