@@ -18,6 +18,8 @@ watch(
   (value) => {
     localStorage.setItem(STORAGE_KEY, value)
     document.documentElement.dataset.theme = value
+    // 同时维护 .dark 类，供 shadcn-vue / Tailwind 的 @custom-variant dark 使用
+    document.documentElement.classList.toggle('dark', value === 'dark')
   },
   { immediate: true },
 )

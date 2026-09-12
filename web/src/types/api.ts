@@ -127,7 +127,7 @@ export interface ItemPatch {
 /**
  * 条件式目标，由服务端展开。
  *
- * 做批量修改时用它而不是逐条枚举，例如「续航分组下全部参数」。
+ * 做批量修改时用它而不是逐条枚举，例如「动力分组下全部参数」。
  */
 export interface OpTarget {
   group?: string

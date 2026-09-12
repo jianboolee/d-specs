@@ -47,7 +47,7 @@ const textStyle = computed(() => ({
   place-items: center;
   overflow: hidden;
   background: var(--ds-primary);
-  color: #fff;
+  color: var(--ds-primary-foreground);
   font-weight: 600;
   line-height: 1;
   user-select: none;

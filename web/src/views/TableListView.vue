@@ -1,73 +1,81 @@
 <script setup lang="ts">
-import { h, onMounted, reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import {
-  NButton,
-  NForm,
-  NFormItem,
-  NInput,
-  NModal,
-  useDialog,
-  useMessage,
-} from 'naive-ui'
-import type { DropdownOption, FormInst, FormRules } from 'naive-ui'
+import { toast } from 'vue-sonner'
 
 import AppSidebar from '@/components/AppSidebar.vue'
 import { ApiError } from '@/api/http'
 import { useSpecTableStore } from '@/stores/specTable'
 import type { TableSummary } from '@/types/api'
 import { formatRelativeTime } from '@/utils/time'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const router = useRouter()
 const route = useRoute()
-const message = useMessage()
-const dialog = useDialog()
 const spec = useSpecTableStore()
 
 onMounted(() => {
-  void spec.loadTables().catch((err) => message.error(describe(err)))
+  void spec.loadTables().catch((err) => toast.error(describe(err)))
 })
 
 // ---------- 新建 ----------
 
 const showCreate = ref(false)
 const creating = ref(false)
-const formRef = ref<FormInst | null>(null)
-const form = reactive({ title: '', description: '', industry: '' })
-
-const rules: FormRules = {
-  title: [
-    { required: true, message: '请输入产品名称', trigger: ['input', 'blur'] },
-    { max: 120, message: '产品名称不能超过 120 字', trigger: ['input', 'blur'] },
-  ],
-}
+const form = reactive({ title: '' })
+const createError = ref('')
 
 function openCreate() {
   form.title = ''
-  form.description = ''
-  form.industry = ''
+  createError.value = ''
   showCreate.value = true
 }
 
 async function submitCreate() {
-  try {
-    await formRef.value?.validate()
-  } catch {
+  const title = form.title.trim()
+  if (!title) {
+    createError.value = '请输入产品名称'
+    return
+  }
+  if (title.length > 120) {
+    createError.value = '产品名称不能超过 120 字'
     return
   }
 
   creating.value = true
   try {
-    const res = await spec.createTable({
-      title: form.title.trim(),
-      description: form.description.trim(),
-      industry: form.industry.trim(),
-    })
+    const res = await spec.createTable({ title })
     showCreate.value = false
-    message.success('参数表已创建')
+    toast.success('参数表已创建')
     await router.push({ name: 'workspace', params: { id: res.table.id } })
   } catch (err) {
-    message.error(describe(err))
+    toast.error(describe(err))
   } finally {
     creating.value = false
   }
@@ -91,89 +99,58 @@ function open(table: TableSummary) {
   void router.push({ name: 'workspace', params: { id: table.id } })
 }
 
-function actionsFor(table: TableSummary): DropdownOption[] {
-  return [
-    { key: 'open', label: '打开' },
-    { key: 'duplicate', label: '复制为新表' },
-    { key: 'rename', label: '重命名' },
-    { type: 'divider', key: 'divider' },
-    { key: 'delete', label: '删除', props: { style: 'color: #d64545' } },
-  ]
-}
-
-function onAction(key: string, table: TableSummary) {
-  switch (key) {
-    case 'open':
-      open(table)
-      break
-    case 'duplicate':
-      duplicate(table)
-      break
-    case 'rename':
-      rename(table)
-      break
-    case 'delete':
-      remove(table)
-      break
-  }
-}
-
 async function duplicate(table: TableSummary) {
   try {
     const res = await spec.duplicateTable(table.id, `${table.title} 副本`)
-    message.success(`已复制为「${res.table.title}」`)
+    toast.success(`已复制为「${res.table.title}」`)
   } catch (err) {
-    message.error(describe(err))
+    toast.error(describe(err))
   }
 }
 
-async function rename(table: TableSummary) {
-  let next = table.title
-  dialog.create({
-    title: '重命名参数表',
-    content: () =>
-      h(NInput, {
-        defaultValue: table.title,
-        maxlength: 120,
-        autofocus: true,
-        placeholder: '产品名称',
-        'onUpdate:value': (value: string) => {
-          next = value
-        },
-        onKeydown: (e: KeyboardEvent) => {
-          if (e.key === 'Enter') e.preventDefault()
-        },
-      }),
-    positiveText: '保存',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      const title = next.trim()
-      if (!title || title === table.title) return
-      try {
-        await spec.renameTable(table.id, title)
-        message.success('已重命名')
-      } catch (err) {
-        message.error(describe(err))
-      }
-    },
-  })
+// ---------- 重命名（Dialog + Input） ----------
+
+const renaming = ref<TableSummary | null>(null)
+const renameValue = ref('')
+
+function openRename(table: TableSummary) {
+  renaming.value = table
+  renameValue.value = table.title
 }
 
-function remove(table: TableSummary) {
-  dialog.warning({
-    title: '删除参数表',
-    content: `确定删除「${table.title}」？删除后该表不再出现在列表里。`,
-    positiveText: '删除',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      try {
-        await spec.removeTable(table.id)
-        message.success(`已删除「${table.title}」`)
-      } catch (err) {
-        message.error(describe(err))
-      }
-    },
-  })
+async function submitRename() {
+  const table = renaming.value
+  if (!table) return
+  const title = renameValue.value.trim()
+  if (!title || title === table.title) {
+    renaming.value = null
+    return
+  }
+  try {
+    await spec.renameTable(table.id, title)
+    toast.success('已重命名')
+  } catch (err) {
+    toast.error(describe(err))
+  } finally {
+    renaming.value = null
+  }
+}
+
+// ---------- 删除（AlertDialog） ----------
+
+const removing = ref<TableSummary | null>(null)
+
+async function confirmRemove() {
+  const table = removing.value
+  if (!table) return
+  try {
+    await spec.removeTable(table.id)
+    toast.success(`已删除「${table.title}」`)
+  } catch (err) {
+    toast.error(describe(err))
+  } finally {
+    removing.value = null
+  }
 }
 
 // ---------- 展示 ----------
@@ -196,24 +173,24 @@ function describe(err: unknown) {
           <h2>我的参数表</h2>
           <span v-if="spec.tables.length > 0" class="title-count">{{ spec.tables.length }}</span>
         </div>
-        <n-button size="small" type="primary" @click="openCreate">
-          <template #icon><i class="ri-add-line" /></template>
+        <Button size="sm" @click="openCreate">
+          <i class="ri-add-line" />
           新建参数表
-        </n-button>
+        </Button>
       </header>
 
       <div class="content ds-scroll-y">
         <!-- 空态 -->
         <div v-if="spec.tables.length === 0 && !spec.listLoading" class="empty">
           <div class="empty-mark">
-            <i class="ri-file-list-3-line" />
+            <i class="ri-file-list-line" />
           </div>
           <h3>还没有参数表</h3>
           <p>每张参数表对应一个产品。<br />建好之后可以直接让 AI 帮你填充参数。</p>
-          <n-button type="primary" @click="openCreate">
-            <template #icon><i class="ri-add-line" /></template>
+          <Button @click="openCreate">
+            <i class="ri-add-line" />
             新建第一张参数表
-          </n-button>
+          </Button>
         </div>
 
         <!-- 列表 -->
@@ -226,16 +203,32 @@ function describe(err: unknown) {
           >
             <div class="card-head">
               <h3 class="ds-ellipsis">{{ table.title }}</h3>
-              <n-dropdown
-                :options="actionsFor(table)"
-                trigger="click"
-                placement="bottom-end"
-                @select="(key: string) => onAction(key, table)"
-              >
-                <button class="more-btn" type="button" title="更多操作" @click.stop>
-                  <i class="ri-more-2-fill" />
-                </button>
-              </n-dropdown>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <button class="more-btn" type="button" title="更多操作" @click.stop>
+                    <i class="ri-more-2-fill" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem @select="open(table)">
+                    <i class="ri-arrow-right-up-line" />
+                    打开
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @select="duplicate(table)">
+                    <i class="ri-file-copy-line" />
+                    复制为新表
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @select="openRename(table)">
+                    <i class="ri-edit-line" />
+                    重命名
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem class="text-destructive" @select="removing = table">
+                    <i class="ri-delete-bin-line" />
+                    删除
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             <p v-if="table.description" class="card-desc ds-ellipsis">{{ table.description }}</p>
@@ -254,35 +247,69 @@ function describe(err: unknown) {
     </main>
 
     <!-- 新建参数表 -->
-    <n-modal v-model:show="showCreate" :mask-closable="!creating">
-      <div class="modal-card">
-        <h3>新建参数表</h3>
-        <p class="modal-hint">一张表对应一个产品，创建后可以在左侧对话里让 AI 帮你填充参数。</p>
+    <Dialog v-model:open="showCreate">
+      <DialogContent class="sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle>新建参数表</DialogTitle>
+        </DialogHeader>
 
-        <n-form ref="formRef" :model="form" :rules="rules" label-placement="top" @keydown.enter.prevent>
-          <n-form-item label="产品名称" path="title">
-            <n-input v-model:value="form.title" placeholder="例如：某型号蓝牙耳机" maxlength="120" autofocus />
-          </n-form-item>
-          <n-form-item label="简介">
-            <n-input
-              v-model:value="form.description"
-              type="textarea"
-              placeholder="选填"
-              :rows="2"
-              maxlength="2000"
+        <div class="modal-hint">一张表对应一个产品，创建后可以在左侧对话里让 AI 帮你填充参数。</div>
+
+        <form class="modal-form" @submit.prevent="submitCreate">
+          <div class="field">
+            <Label for="create-title">产品名称</Label>
+            <Input
+              id="create-title"
+              v-model="form.title"
+              placeholder="例如：某型号越野房车"
+              maxlength="120"
+              autofocus
+              :aria-invalid="!!createError"
+              @input="createError = ''"
             />
-          </n-form-item>
-          <n-form-item label="行业">
-            <n-input v-model:value="form.industry" placeholder="选填，例如：消费电子" maxlength="64" />
-          </n-form-item>
-        </n-form>
+            <p v-if="createError" class="field-error">{{ createError }}</p>
+          </div>
+        </form>
 
-        <div class="modal-actions">
-          <n-button quaternary :disabled="creating" @click="showCreate = false">取消</n-button>
-          <n-button type="primary" :loading="creating" @click="submitCreate">创建</n-button>
-        </div>
-      </div>
-    </n-modal>
+        <DialogFooter>
+          <Button variant="outline" :disabled="creating" @click="showCreate = false">取消</Button>
+          <Button :disabled="creating" @click="submitCreate">
+            <i v-if="creating" class="ri-loader-4-line animate-spin" />
+            创建
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- 重命名 -->
+    <Dialog :open="!!renaming" @update:open="(v) => !v && (renaming = null)">
+      <DialogContent class="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>重命名参数表</DialogTitle>
+        </DialogHeader>
+        <Input v-model="renameValue" maxlength="120" placeholder="产品名称" autofocus @keydown.enter.prevent="submitRename" />
+        <DialogFooter>
+          <Button variant="outline" @click="renaming = null">取消</Button>
+          <Button @click="submitRename">保存</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <!-- 删除确认 -->
+    <AlertDialog :open="!!removing" @update:open="(v) => !v && (removing = null)">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>删除参数表</AlertDialogTitle>
+          <AlertDialogDescription>
+            确定删除「{{ removing?.title }}」？删除后该表不再出现在列表里。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="removing = null">取消</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" @click="confirmRemove">删除</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
@@ -342,7 +369,7 @@ function describe(err: unknown) {
 
 .topbar h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--ds-font-base);
   font-weight: 600;
 }
 
@@ -351,7 +378,7 @@ function describe(err: unknown) {
   border-radius: 20px;
   background: var(--ds-surface-muted);
   color: var(--ds-text-tertiary);
-  font-size: 11.5px;
+  font-size: var(--ds-font-xs);
 }
 
 .content {
@@ -389,7 +416,7 @@ function describe(err: unknown) {
 
 .empty p {
   margin: 0 0 22px;
-  font-size: 13.5px;
+  font-size: var(--ds-font-sm);
   line-height: 1.85;
   color: var(--ds-text-secondary);
 }
@@ -428,7 +455,7 @@ function describe(err: unknown) {
   flex: 1;
   min-width: 0;
   margin: 0;
-  font-size: 14px;
+  font-size: var(--ds-font-md);
   font-weight: 600;
   color: var(--ds-text);
 }
@@ -458,7 +485,7 @@ function describe(err: unknown) {
 
 .card-desc {
   margin: 6px 0 14px;
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-secondary);
   min-height: 19px;
 }
@@ -472,7 +499,7 @@ function describe(err: unknown) {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
   font-variant-numeric: tabular-nums;
 }
@@ -482,7 +509,7 @@ function describe(err: unknown) {
   border-radius: 20px;
   background: var(--ds-primary-soft);
   color: var(--ds-primary);
-  font-size: 11px;
+  font-size: var(--ds-font-xs);
 }
 
 .stat {
@@ -499,32 +526,40 @@ function describe(err: unknown) {
 
 /* 弹窗 */
 
-.modal-card {
-  width: min(440px, calc(100vw - 32px));
-  padding: 22px 24px;
-  border-radius: 16px;
-  background: var(--ds-surface);
-  border: 1px solid var(--ds-border);
-}
-
-.modal-card h3 {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ds-text);
-}
-
 .modal-hint {
-  margin: 0 0 18px;
-  font-size: 12.5px;
+  margin: 0 0 16px;
+  font-size: var(--ds-font-xs);
   line-height: 1.7;
   color: var(--ds-text-tertiary);
 }
 
-.modal-actions {
+.modal-form {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modal-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-form .field label {
+  font-size: var(--ds-font-sm);
+  color: var(--ds-text-secondary);
+}
+
+/* 弹窗内输入框比组件默认（h-8）更高 */
+.modal-form :deep(input) {
+  height: 46px;
+  padding-inline: 14px;
+  font-size: var(--ds-font-base);
+}
+
+.field-error {
+  margin: 0;
+  font-size: var(--ds-font-xs);
+  color: #d64545;
 }
 </style>

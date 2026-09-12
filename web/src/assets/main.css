@@ -1,40 +1,61 @@
 /* ==================== 设计令牌 ==================== */
 
 :root {
-  --ds-bg: #f7f8fa;
+  /* 中性灰白：参考 ChatGPT 的冷中性配色，主操作色就是近黑的正文色，不再用彩色强调 */
+  --ds-bg: #ffffff;
+  --ds-sidebar-bg: #f9f9f9;
   --ds-surface: #ffffff;
-  --ds-surface-muted: #f2f3f7;
-  --ds-border: #e6e8ee;
-  --ds-border-strong: #d8dbe4;
+  --ds-surface-muted: #f4f4f4;
+  --ds-border: #ececec;
+  --ds-border-strong: #e0e0e0;
 
-  --ds-text: #1a1d24;
-  --ds-text-secondary: #5c6270;
-  --ds-text-tertiary: #9299a6;
+  --ds-text: #000000;
+  --ds-text-secondary: #6b6b6b;
+  --ds-text-tertiary: #5d5d5d;
 
-  --ds-primary: #5b5fef;
-  --ds-primary-soft: rgba(91, 95, 239, 0.1);
-  --ds-highlight: rgba(245, 166, 35, 0.18);
+  --ds-primary: #1a1a1a;
+  --ds-primary-hover: #333333;
+  --ds-primary-foreground: #ffffff;
+  --ds-primary-soft: rgba(0, 0, 0, 0.06);
+  --ds-highlight: rgba(0, 0, 0, 0.08);
+  --ds-focus-ring: rgba(0, 0, 0, 0.12);
+  --ds-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --ds-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
 
   --ds-sidebar-width: 248px;
-  --ds-canvas-width: 46%;
+  /* 对话正文列最大宽度：对齐主流 AI 对话（ChatGPT/Claude/DeepSeek 均为 48rem），
+     避免宽屏下单行过长影响阅读 */
+  --ds-chat-max: 768px;
   --ds-radius: 10px;
   --ds-radius-lg: 14px;
+
+  /* 字号阶梯：正文 16px，辅助文字不再小于 12px */
+  --ds-font-xs: 12px;
+  --ds-font-sm: 14px;
+  --ds-font-md: 15px;
+  --ds-font-base: 16px;
 }
 
 html[data-theme='dark'] {
-  --ds-bg: #14161c;
-  --ds-surface: #1b1e26;
-  --ds-surface-muted: #22262f;
-  --ds-border: #2a2f3a;
-  --ds-border-strong: #363c48;
+  --ds-bg: #212121;
+  --ds-sidebar-bg: #171717;
+  --ds-surface: #212121;
+  --ds-surface-muted: #2f2f2f;
+  --ds-border: #3a3a3a;
+  --ds-border-strong: #4d4d4d;
 
-  --ds-text: #e8eaf0;
-  --ds-text-secondary: #a2a9b8;
-  --ds-text-tertiary: #767e8d;
+  --ds-text: #ececec;
+  --ds-text-secondary: #b4b4b4;
+  --ds-text-tertiary: #8a8a8a;
 
-  --ds-primary: #7b7ff5;
-  --ds-primary-soft: rgba(123, 127, 245, 0.16);
-  --ds-highlight: rgba(245, 166, 35, 0.22);
+  --ds-primary: #ececec;
+  --ds-primary-hover: #ffffff;
+  --ds-primary-foreground: #1a1a1a;
+  --ds-primary-soft: rgba(255, 255, 255, 0.08);
+  --ds-highlight: rgba(255, 255, 255, 0.12);
+  --ds-focus-ring: rgba(255, 255, 255, 0.16);
+  --ds-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --ds-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
 /* ==================== 基础重置 ==================== */
@@ -60,25 +81,13 @@ body {
   height: 100%;
 }
 
-/*
- * naive-ui 的 ConfigProvider 默认会渲染一层 <div class="n-config-provider">。
- * 少了这条，height:100% 的链条会在这里断掉 —— .shell 的 100% 会解析成 auto，
- * 整条 flex 链塌成内容高度，表现就是「页面没铺满视口、内部容器滚不动」。
- *
- * 其它几个 Provider（LoadingBar / Message / Dialog）渲染的是 Fragment，
- * 不产生包裹元素，所以只需要处理这一个。
- */
-.n-config-provider {
-  height: 100%;
-}
-
 body {
   background: var(--ds-bg);
   color: var(--ds-text);
   font-family:
     -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
     'Helvetica Neue', Arial, sans-serif;
-  font-size: 14px;
+  font-size: var(--ds-font-base);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }

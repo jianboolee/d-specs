@@ -5,6 +5,7 @@ import router from './router'
 import { pinia } from './stores'
 
 import '@/assets/main.css'
+import '@/assets/tailwind.css'
 import 'remixicon/fonts/remixicon.css'
 
 const app = createApp(App)

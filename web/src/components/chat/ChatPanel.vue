@@ -35,6 +35,31 @@ const emit = defineEmits<{
 
 const draft = ref('')
 const listRef = ref<HTMLElement | null>(null)
+const textareaRef = ref<HTMLTextAreaElement | null>(null)
+
+/** 空态下的快捷建议，点击后填入输入框 */
+const suggestions = [
+  '帮我建一张房车的参数表',
+  '把续航里程改成 800km',
+  '给动力分组下的参数都加上单位',
+  '把这张表按分组重新整理一遍',
+]
+
+/** 输入框随内容自动增高，超过上限后内部滚动 */
+const MAX_INPUT_HEIGHT = 148
+
+function autoResize() {
+  const el = textareaRef.value
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.min(el.scrollHeight, MAX_INPUT_HEIGHT)}px`
+}
+
+function pickSuggestion(text: string) {
+  draft.value = text
+  textareaRef.value?.focus()
+  autoResize()
+}
 
 /** 消息条数或最后一条的文字变化时滚到底部（流式时文字是持续增长的） */
 const tailText = computed(() => {
@@ -162,18 +187,31 @@ function kindLabel(kind: ChatChange['kind']) {
       <!-- 空态作为插槽放在滚动区内，避免用绝对定位叠在列表上 -->
       <div v-else-if="messages.length === 0 && !sending" class="chat-empty">
         <slot name="empty" />
+        <div class="suggestions">
+          <button
+            v-for="s in suggestions"
+            :key="s"
+            type="button"
+            class="suggestion"
+            @click="pickSuggestion(s)"
+          >
+            {{ s }}
+          </button>
+        </div>
       </div>
     </div>
 
     <div class="composer">
       <div class="composer-box">
         <textarea
+          ref="textareaRef"
           v-model="draft"
           class="composer-input"
           rows="1"
           placeholder="告诉 AI 你要怎么调整这张参数表…"
           :disabled="disabled"
           @keydown="onKeydown"
+          @input="autoResize"
         />
         <button v-if="sending" type="button" class="stop-btn" title="停止" @click="emit('stop')">
           <i class="ri-stop-fill" />
@@ -205,10 +243,15 @@ function kindLabel(kind: ChatChange['kind']) {
   background: var(--ds-bg);
 }
 
+/*
+ * 正文列限宽：面板比 --ds-chat-max 宽时，左右留白把内容居中，
+ * 滚动条仍贴在面板右缘。窄面板下退回固定的 24px 内边距。
+ */
 .chat-list {
   flex: 1;
   min-height: 0;
-  padding: 22px 22px 8px;
+  padding-block: 24px 8px;
+  padding-inline: max(24px, calc((100% - var(--ds-chat-max)) / 2));
 }
 
 /* 历史加载态：占满滚动区居中 */
@@ -218,32 +261,59 @@ function kindLabel(kind: ChatChange['kind']) {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
 }
 
 /* 空态：在滚动区里垂直居中，内容超高时随列表一起滚动 */
 .chat-empty {
   min-height: 100%;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
   padding: 24px 8px 40px;
 }
 
 .chat-empty :deep(p) {
   margin: 0;
-  max-width: 320px;
-  font-size: 12.5px;
-  line-height: 2;
+  max-width: 360px;
+  font-size: var(--ds-font-base);
+  line-height: 1.9;
   color: var(--ds-text-tertiary);
   white-space: pre-wrap;
   text-align: center;
 }
 
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 340px;
+}
+
+.suggestion {
+  padding: 6px 12px;
+  border-radius: 16px;
+  background: var(--ds-surface-muted);
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-font-xs);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.suggestion:hover {
+  background: var(--ds-border);
+  color: var(--ds-text);
+}
+
 .msg {
   display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 24px;
+  align-items: flex-start;
 }
 
 .msg.user {
@@ -252,7 +322,7 @@ function kindLabel(kind: ChatChange['kind']) {
 
 .msg-body {
   min-width: 0;
-  max-width: 88%;
+  max-width: 82%;
 }
 
 .msg.user .msg-body {
@@ -261,36 +331,40 @@ function kindLabel(kind: ChatChange['kind']) {
 }
 
 .msg-avatar {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   flex: none;
   display: grid;
   place-items: center;
   border-radius: 8px;
   background: var(--ds-primary);
-  color: #fff;
-  font-size: 13px;
+  color: var(--ds-primary-foreground);
+  font-size: var(--ds-font-base);
 }
 
 .msg-bubble {
   display: inline-block;
-  padding: 9px 13px;
-  border-radius: 12px;
-  font-size: 13.5px;
-  line-height: 1.75;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: var(--ds-font-base);
+  line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
+/* assistant：无气泡，直接流式文字（ChatGPT 风格） */
 .msg.assistant .msg-bubble {
-  background: var(--ds-surface);
-  border: 1px solid var(--ds-border);
+  padding: 2px 0;
+  background: transparent;
+  border: none;
   color: var(--ds-text);
 }
 
+/* user：浅灰圆角气泡，右下角收小 */
 .msg.user .msg-bubble {
-  background: var(--ds-primary);
-  color: #fff;
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+  border-bottom-right-radius: 6px;
 }
 
 .msg-bubble.undone {
@@ -298,7 +372,10 @@ function kindLabel(kind: ChatChange['kind']) {
 }
 
 .typing-bubble {
-  padding: 12px 14px;
+  padding: 10px 14px;
+  background: var(--ds-surface-muted);
+  border-radius: 16px;
+  border-top-left-radius: 6px;
 }
 
 .tool-line {
@@ -306,7 +383,7 @@ function kindLabel(kind: ChatChange['kind']) {
   align-items: center;
   gap: 6px;
   margin-top: 8px;
-  font-size: 12px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
 }
 
@@ -323,9 +400,8 @@ function kindLabel(kind: ChatChange['kind']) {
 .changes {
   margin-top: 9px;
   padding: 10px 12px;
-  border: 1px solid var(--ds-border);
   border-radius: 10px;
-  background: var(--ds-surface);
+  background: var(--ds-surface-muted);
 }
 
 .changes.undone {
@@ -336,13 +412,13 @@ function kindLabel(kind: ChatChange['kind']) {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-secondary);
 }
 
 .changes-head > i {
   color: #18a058;
-  font-size: 14px;
+  font-size: var(--ds-font-md);
 }
 
 .changes.undone .changes-head > i {
@@ -354,18 +430,17 @@ function kindLabel(kind: ChatChange['kind']) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--ds-border);
+  padding: 3px 10px;
   border-radius: 6px;
-  background: transparent;
+  background: var(--ds-surface-muted);
   color: var(--ds-text-secondary);
-  font-size: 12px;
+  font-size: var(--ds-font-xs);
   cursor: pointer;
 }
 
 .undo:hover {
-  border-color: var(--ds-primary);
-  color: var(--ds-primary);
+  background: var(--ds-border);
+  color: var(--ds-text);
 }
 
 .changes ul {
@@ -379,21 +454,21 @@ function kindLabel(kind: ChatChange['kind']) {
   align-items: center;
   gap: 6px;
   padding: 3px 0;
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-secondary);
   flex-wrap: wrap;
 }
 
 .changes li > i {
   color: var(--ds-text-tertiary);
-  font-size: 12px;
+  font-size: var(--ds-font-xs);
 }
 
 .change-kind {
   flex: none;
   padding: 0 5px;
   border-radius: 4px;
-  font-size: 10.5px;
+  font-size: var(--ds-font-xs);
   background: var(--ds-surface-muted);
   color: var(--ds-text-tertiary);
 }
@@ -435,7 +510,7 @@ function kindLabel(kind: ChatChange['kind']) {
   margin-top: 9px;
   padding: 8px 12px;
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
 }
 
 .pending {
@@ -484,22 +559,27 @@ function kindLabel(kind: ChatChange['kind']) {
 
 .composer {
   flex: none;
-  padding: 10px 22px 16px;
+  padding-block: 10px 16px;
+  /* 输入区与消息列同宽对齐 */
+  padding-inline: max(22px, calc((100% - var(--ds-chat-max)) / 2));
 }
 
 .composer-box {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  padding: 8px 8px 8px 14px;
-  border: 1px solid var(--ds-border-strong);
-  border-radius: 14px;
+  padding: 10px 10px 10px 16px;
+  border: 1px solid var(--ds-border);
+  border-radius: 16px;
   background: var(--ds-surface);
-  transition: border-color 0.16s ease;
+  box-shadow: var(--ds-shadow-sm);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .composer-box:focus-within {
-  border-color: var(--ds-primary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
 }
 
 .composer-input {
@@ -509,10 +589,11 @@ function kindLabel(kind: ChatChange['kind']) {
   border: none;
   outline: none;
   resize: none;
+  overflow-y: auto;
   background: transparent;
   color: var(--ds-text);
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: var(--ds-font-base);
   line-height: 1.7;
   padding: 4px 0;
 }
@@ -530,17 +611,27 @@ function kindLabel(kind: ChatChange['kind']) {
   place-items: center;
   border: none;
   border-radius: 10px;
-  color: #fff;
+  color: var(--ds-primary-foreground);
   font-size: 16px;
   cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    background-color 0.16s ease,
+    opacity 0.16s ease;
 }
 
 .send-btn {
   background: var(--ds-primary);
 }
 
+.send-btn:hover:not(:disabled) {
+  background: var(--ds-primary-hover);
+  transform: translateY(-1px) scale(1.04);
+}
+
 .stop-btn {
   background: var(--ds-text-secondary);
+  color: #fff;
 }
 
 .send-btn:disabled {
@@ -550,7 +641,7 @@ function kindLabel(kind: ChatChange['kind']) {
 
 .composer-hint {
   margin: 8px 2px 0;
-  font-size: 11.5px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
 }
 </style>

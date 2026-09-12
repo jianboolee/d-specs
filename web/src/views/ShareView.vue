@@ -3,7 +3,6 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import * as shareApi from '@/api/share'
-import BrandMark from '@/components/BrandMark.vue'
 import { ApiError } from '@/api/http'
 import type { PublicSpec } from '@/types/api'
 
@@ -59,14 +58,6 @@ onUnmounted(() => {
 
 <template>
   <div class="share-page">
-    <header class="share-head">
-      <div class="brand">
-        <BrandMark :size="26" />
-        <span class="brand-name">参数配置表</span>
-      </div>
-      <span class="readonly-tag">只读分享</span>
-    </header>
-
     <main class="share-main">
       <div v-if="loading" class="state">加载中…</div>
 
@@ -104,12 +95,10 @@ onUnmounted(() => {
             </div>
           </dl>
         </section>
-
-        <p class="share-foot">
-          本页为只读分享，内容由创建者维护
-        </p>
       </template>
     </main>
+
+    <footer class="share-foot">由小野驴科技提供技术支持</footer>
   </div>
 </template>
 
@@ -121,52 +110,17 @@ onUnmounted(() => {
   background: var(--ds-bg);
 }
 
-/* 头部随页面滚动还是固定？分享页内容可能很长，头部保持固定更好找 */
-.share-head {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--ds-border);
-  background: var(--ds-surface);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-
-
-.brand-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ds-text);
-}
-
-.readonly-tag {
-  margin-left: auto;
-  padding: 2px 9px;
-  border-radius: 20px;
-  background: var(--ds-surface-muted);
-  color: var(--ds-text-tertiary);
-  font-size: 11.5px;
-}
-
 .share-main {
   max-width: 720px;
   margin: 0 auto;
-  padding: 30px 20px 64px;
+  padding: 44px 20px 28px;
 }
 
 .state {
   padding: 72px 0;
   text-align: center;
   color: var(--ds-text-tertiary);
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
 }
 
 .state.error i {
@@ -182,12 +136,12 @@ onUnmounted(() => {
 
 .state.error p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
 }
 
 .state-hint {
   margin-top: 6px !important;
-  font-size: 12px !important;
+  font-size: var(--ds-font-xs) !important;
   color: var(--ds-text-tertiary);
 }
 
@@ -205,7 +159,7 @@ onUnmounted(() => {
 
 .spec-desc {
   margin: 0 0 12px;
-  font-size: 13.5px;
+  font-size: var(--ds-font-sm);
   line-height: 1.75;
   color: var(--ds-text-secondary);
 }
@@ -214,7 +168,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 12px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
 }
 
@@ -235,7 +189,7 @@ onUnmounted(() => {
 
 .group h2 {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
   font-weight: 600;
   color: var(--ds-text-secondary);
 }
@@ -261,14 +215,14 @@ onUnmounted(() => {
 
 .spec-row dt {
   flex: 0 0 42%;
-  font-size: 13.5px;
+  font-size: var(--ds-font-sm);
   color: var(--ds-text-secondary);
 }
 
 .spec-row dd {
   flex: 1;
   margin: 0;
-  font-size: 14px;
+  font-size: var(--ds-font-md);
   font-weight: 500;
   color: var(--ds-text);
 }
@@ -280,29 +234,45 @@ onUnmounted(() => {
 }
 
 .share-foot {
-  margin: 44px 0 0;
+  padding: 0 20px 40px;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
 }
 
 @media (max-width: 560px) {
   .share-main {
-    padding: 22px 16px 48px;
+    padding: 22px 14px 40px;
+  }
+
+  .spec-head {
+    margin-bottom: 24px;
   }
 
   .spec-head h1 {
     font-size: 20px;
   }
 
+  /*
+   * 移动端保持左右两列结构：两侧同时收紧内边距、列间距和字号，
+   * 并允许长参数名/值换行，避免固定 42% 列宽下内容被挤压或横向溢出。
+   */
   .spec-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+    gap: 10px;
+    padding: 11px 12px;
   }
 
   .spec-row dt {
-    flex: none;
+    flex: 0 0 40%;
+    font-size: var(--ds-font-xs);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+
+  .spec-row dd {
+    font-size: var(--ds-font-sm);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
   }
 }
 </style>

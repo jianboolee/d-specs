@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { NButton, NModal, useMessage } from 'naive-ui'
+import { toast } from 'vue-sonner'
 
 import * as shareApi from '@/api/share'
 import { ApiError } from '@/api/http'
 import type { ShareStatus } from '@/types/api'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const props = defineProps<{
   show: boolean
@@ -15,8 +24,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:show': [value: boolean]
 }>()
-
-const message = useMessage()
 
 const loading = ref(false)
 const busy = ref(false)
@@ -42,7 +49,7 @@ async function load() {
   try {
     status.value = await shareApi.getShareStatus(props.tableId)
   } catch (err) {
-    message.error(describe(err))
+    toast.error(describe(err))
   } finally {
     loading.value = false
   }
@@ -54,9 +61,9 @@ async function toggle() {
     status.value = enabled.value
       ? await shareApi.disableShare(props.tableId)
       : await shareApi.enableShare(props.tableId)
-    message.success(enabled.value ? '已开启分享' : '已关闭分享，原链接立即失效')
+    toast.success(enabled.value ? '已开启分享' : '已关闭分享，原链接立即失效')
   } catch (err) {
-    message.error(describe(err))
+    toast.error(describe(err))
   } finally {
     busy.value = false
   }
@@ -66,9 +73,9 @@ async function copyLink() {
   if (!fullUrl.value) return
   try {
     await navigator.clipboard.writeText(fullUrl.value)
-    message.success('链接已复制')
+    toast.success('链接已复制')
   } catch {
-    message.warning('复制失败，请手动选中链接')
+    toast.warning('复制失败，请手动选中链接')
   }
 }
 
@@ -83,14 +90,12 @@ function describe(err: unknown) {
 </script>
 
 <template>
-  <n-modal
-    :show="show"
-    :mask-closable="!busy"
-    @update:show="(value: boolean) => emit('update:show', value)"
-  >
-    <div class="share-card">
-      <h3>分享参数表</h3>
-      <p class="share-sub">「{{ tableTitle }}」</p>
+  <Dialog :open="show" @update:open="(v: boolean) => emit('update:show', v)">
+    <DialogContent class="sm:max-w-[480px]">
+      <DialogHeader>
+        <DialogTitle>分享参数表</DialogTitle>
+        <DialogDescription>「{{ tableTitle }}」</DialogDescription>
+      </DialogHeader>
 
       <div v-if="loading" class="share-loading">加载中…</div>
 
@@ -103,15 +108,15 @@ function describe(err: unknown) {
             </span>
             <span v-else>开启后会生成一个只读链接，可随时关闭</span>
           </div>
-          <n-button :type="enabled ? 'default' : 'primary'" :loading="busy" @click="toggle">
+          <Button :variant="enabled ? 'outline' : 'default'" :disabled="busy" @click="toggle">
             {{ enabled ? '关闭分享' : '开启分享' }}
-          </n-button>
+          </Button>
         </div>
 
         <div v-if="enabled && fullUrl" class="share-link">
           <input class="link-input" :value="fullUrl" readonly @focus="($event.target as HTMLInputElement).select()" />
-          <n-button size="small" @click="copyLink">复制</n-button>
-          <n-button size="small" quaternary @click="openLink">预览</n-button>
+          <Button size="sm" variant="outline" @click="copyLink">复制</Button>
+          <Button size="sm" variant="ghost" @click="openLink">预览</Button>
         </div>
 
         <p class="share-tip">
@@ -119,39 +124,18 @@ function describe(err: unknown) {
         </p>
       </template>
 
-      <div class="share-actions">
-        <n-button quaternary @click="emit('update:show', false)">完成</n-button>
-      </div>
-    </div>
-  </n-modal>
+      <DialogFooter>
+        <Button variant="outline" @click="emit('update:show', false)">完成</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped>
-.share-card {
-  width: min(480px, calc(100vw - 32px));
-  padding: 22px 24px;
-  border-radius: 16px;
-  background: var(--ds-surface);
-  border: 1px solid var(--ds-border);
-}
-
-.share-card h3 {
-  margin: 0 0 4px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ds-text);
-}
-
-.share-sub {
-  margin: 0 0 18px;
-  font-size: 12.5px;
-  color: var(--ds-text-tertiary);
-}
-
 .share-loading {
   padding: 28px 0;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
   color: var(--ds-text-tertiary);
 }
 
@@ -174,13 +158,13 @@ function describe(err: unknown) {
 }
 
 .state-text strong {
-  font-size: 13.5px;
+  font-size: var(--ds-font-sm);
   font-weight: 600;
   color: var(--ds-text);
 }
 
 .state-text span {
-  font-size: 12px;
+  font-size: var(--ds-font-xs);
   line-height: 1.6;
   color: var(--ds-text-secondary);
 }
@@ -202,25 +186,18 @@ function describe(err: unknown) {
   background: var(--ds-surface);
   color: var(--ds-text-secondary);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
   outline: none;
 }
 
 .link-input:focus {
-  border-color: var(--ds-primary);
   color: var(--ds-text);
 }
 
 .share-tip {
   margin: 14px 0 0;
-  font-size: 11.5px;
+  font-size: var(--ds-font-xs);
   line-height: 1.72;
   color: var(--ds-text-tertiary);
-}
-
-.share-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 18px;
 }
 </style>

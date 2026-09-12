@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NButton, NPopover, useDialog, useMessage } from 'naive-ui'
+import { toast } from 'vue-sonner'
 
 import AppSidebar from '@/components/AppSidebar.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
@@ -11,11 +11,32 @@ import { ApiError } from '@/api/http'
 import { useChatStore } from '@/stores/chat'
 import { useSpecTableStore } from '@/stores/specTable'
 import { formatRelativeTime } from '@/utils/time'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 const route = useRoute()
 const router = useRouter()
-const message = useMessage()
-const dialog = useDialog()
 const spec = useSpecTableStore()
 const chat = useChatStore()
 
@@ -28,69 +49,34 @@ const revision = computed(() => spec.table?.current_revision ?? 0)
 const showShare = ref(false)
 const showSessions = ref(false)
 
-/** AI 对话栏宽度：固定像素，支持拖动分隔条调整，并持久化到本地 */
-const CHAT_WIDTH_KEY = 'dspecs.chatWidth'
-const CHAT_WIDTH_MIN = 360
-const CHAT_WIDTH_MAX = 720
-const CHAT_WIDTH_DEFAULT = 440
+// ---------- 标题编辑（放在 chat-head 里） ----------
 
-function readChatWidth(): number {
-  const n = Number(localStorage.getItem(CHAT_WIDTH_KEY))
-  if (Number.isFinite(n)) return Math.min(CHAT_WIDTH_MAX, Math.max(CHAT_WIDTH_MIN, n))
-  return CHAT_WIDTH_DEFAULT
+const titleDraft = ref('')
+const editingTitle = ref(false)
+const titleInputRef = ref<HTMLInputElement | null>(null)
+
+async function startRename() {
+  titleDraft.value = title.value
+  editingTitle.value = true
+  // span 被 v-if 换成 input 后焦点会丢失，等渲染完再手动聚焦
+  await nextTick()
+  titleInputRef.value?.focus()
+  titleInputRef.value?.select()
 }
 
-const chatWidth = ref(readChatWidth())
-const resizing = ref(false)
-let resizeCleanup: (() => void) | null = null
-
-function onResizeDown(event: PointerEvent) {
-  if (event.button !== 0) return
-  resizing.value = true
-  const startX = event.clientX
-  const startWidth = chatWidth.value
-  document.body.classList.add('ds-resizing-col')
-
-  const onMove = (ev: PointerEvent) => {
-    chatWidth.value = Math.min(
-      CHAT_WIDTH_MAX,
-      Math.max(CHAT_WIDTH_MIN, startWidth + ev.clientX - startX),
-    )
-  }
-  const onUp = () => finishResize()
-  resizeCleanup = () => {
-    window.removeEventListener('pointermove', onMove)
-    window.removeEventListener('pointerup', onUp)
-    window.removeEventListener('pointercancel', onUp)
-  }
-  window.addEventListener('pointermove', onMove)
-  window.addEventListener('pointerup', onUp)
-  window.addEventListener('pointercancel', onUp)
+function commitRename() {
+  editingTitle.value = false
+  const next = titleDraft.value.trim()
+  if (!next || next === title.value) return
+  void handleRename(next)
 }
-
-function finishResize() {
-  resizing.value = false
-  document.body.classList.remove('ds-resizing-col')
-  resizeCleanup?.()
-  resizeCleanup = null
-  localStorage.setItem(CHAT_WIDTH_KEY, String(chatWidth.value))
-}
-
-onBeforeUnmount(finishResize)
-
-/** 当前会话的状态摘要，显示在对话区头部 */
-const sessionHint = computed(() => {
-  const current = chat.currentSession
-  if (!current) return '新对话'
-  return `${current.message_count} 条消息 · ${formatRelativeTime(current.updated_at)}`
-})
 
 const chatPlaceholder = computed(
   () =>
     '直接告诉我要怎么调整这张表，例如：\n\n' +
-    '· 帮我建一张蓝牙耳机的参数表\n' +
-    '· 把电池容量改成 5000mAh\n' +
-    '· 续航分组下的参数都加上单位\n\n' +
+    '· 帮我建一张房车的参数表\n' +
+    '· 把续航里程改成 800km\n' +
+    '· 动力分组下的参数都加上单位\n\n' +
     '改动会自动应用，随时可以撤销。',
 )
 
@@ -100,9 +86,9 @@ async function load() {
     await spec.openTable(tableId.value)
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) {
-      message.error('参数表不存在或已删除')
+      toast.error('参数表不存在或已删除')
     } else {
-      message.error(err instanceof ApiError ? err.message : '加载失败')
+      toast.error(err instanceof ApiError ? err.message : '加载失败')
     }
     void router.replace({ name: 'tables' })
     return
@@ -133,7 +119,7 @@ async function handleUpdateItem(itemId: string, patch: { name?: string; value?: 
   try {
     await spec.updateItem(itemId, patch, '手工修改参数')
   } catch (err) {
-    message.error(err instanceof ApiError ? err.message : '保存失败')
+    toast.error(err instanceof ApiError ? err.message : '保存失败')
   }
 }
 
@@ -151,46 +137,46 @@ async function handleAddItem(draft: {
       group_name: draft.group_name,
     })
   } catch (err) {
-    message.error(err instanceof ApiError ? err.message : '新增失败')
+    toast.error(err instanceof ApiError ? err.message : '新增失败')
   }
 }
 
+const removingItem = ref<{ id: string; name: string } | null>(null)
+
 function handleRemoveItem(itemId: string, name: string) {
-  dialog.warning({
-    title: '删除参数',
-    content: `确定删除「${name}」？删除会记录为一个新版本，之后仍可撤销。`,
-    positiveText: '删除',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      try {
-        await spec.removeItem(itemId, name)
-      } catch (err) {
-        message.error(err instanceof ApiError ? err.message : '删除失败')
-      }
-    },
-  })
+  removingItem.value = { id: itemId, name }
 }
 
+async function confirmRemoveItem() {
+  const target = removingItem.value
+  if (!target) return
+  try {
+    await spec.removeItem(target.id, target.name)
+  } catch (err) {
+    toast.error(err instanceof ApiError ? err.message : '删除失败')
+  } finally {
+    removingItem.value = null
+  }
+}
+
+const removingTable = ref(false)
+
 function handleRemoveTable() {
+  if (spec.table) removingTable.value = true
+}
+
+async function confirmRemoveTable() {
   const table = spec.table
   if (!table) return
-  const title = table.title
-
-  dialog.warning({
-    title: '删除参数表',
-    content: `确定删除「${title}」？删除后该表不再出现在列表里。`,
-    positiveText: '删除',
-    negativeText: '取消',
-    onPositiveClick: async () => {
-      try {
-        await spec.removeTable(table.id)
-        message.success(`已删除「${title}」`)
-        void router.replace({ name: 'tables' })
-      } catch (err) {
-        message.error(err instanceof ApiError ? err.message : '删除失败')
-      }
-    },
-  })
+  try {
+    await spec.removeTable(table.id)
+    toast.success(`已删除「${table.title}」`)
+    void router.replace({ name: 'tables' })
+  } catch (err) {
+    toast.error(err instanceof ApiError ? err.message : '删除失败')
+  } finally {
+    removingTable.value = false
+  }
 }
 
 async function handleRename(next: string) {
@@ -198,25 +184,25 @@ async function handleRename(next: string) {
   try {
     await spec.renameTable(spec.table.id, next)
   } catch (err) {
-    message.error(err instanceof ApiError ? err.message : '重命名失败')
+    toast.error(err instanceof ApiError ? err.message : '重命名失败')
   }
 }
 
 async function handleUndo() {
   try {
     const res = await spec.undo()
-    if (res) message.success(res.summary || '已撤销')
+    if (res) toast.success(res.summary || '已撤销')
   } catch (err) {
-    message.error(err instanceof ApiError ? err.message : '撤销失败')
+    toast.error(err instanceof ApiError ? err.message : '撤销失败')
   }
 }
 
 async function handleRedo() {
   try {
     const res = await spec.redo()
-    if (res) message.success(res.summary || '已重做')
+    if (res) toast.success(res.summary || '已重做')
   } catch (err) {
-    message.error(err instanceof ApiError ? err.message : '重做失败')
+    toast.error(err instanceof ApiError ? err.message : '重做失败')
   }
 }
 
@@ -224,16 +210,16 @@ async function handleRedo() {
 
 async function handleSend(text: string) {
   await chat.send(text)
-  if (chat.lastError) message.error(chat.lastError)
+  if (chat.lastError) toast.error(chat.lastError)
 }
 
 async function handleUndoMessage(messageId: string) {
   try {
     const ok = await chat.undoMessage(messageId)
-    if (ok) message.success('已撤销这次 AI 改动')
-    else message.warning('没有可撤销的版本')
+    if (ok) toast.success('已撤销这次 AI 改动')
+    else toast.warning('没有可撤销的版本')
   } catch (err) {
-    message.error(err instanceof ApiError ? err.message : '撤销失败')
+    toast.error(err instanceof ApiError ? err.message : '撤销失败')
   }
 }
 </script>
@@ -246,62 +232,43 @@ async function handleUndoMessage(messageId: string) {
       <div v-if="spec.loading && !spec.table" class="loading">加载中…</div>
 
       <div v-else-if="spec.table" class="workspace">
-        <div class="chat-col" :style="{ width: chatWidth + 'px' }">
+        <div class="chat-col">
           <header class="chat-head">
-            <span class="dot" :class="{ busy: chat.sending }" />
             <div class="head-text">
-              <span class="head-title">AI 助手</span>
-              <span class="head-sub ds-ellipsis">{{ sessionHint }}</span>
+              <input
+                v-if="editingTitle"
+                ref="titleInputRef"
+                v-model="titleDraft"
+                class="title-input"
+                @blur="commitRename"
+                @keydown.enter.prevent="commitRename"
+                @keydown.esc="editingTitle = false"
+              />
+              <span v-else class="head-title ds-ellipsis" :class="{ clickable: !!title }" @click="startRename">
+                {{ title }}
+              </span>
+              <span v-if="description" class="head-sub ds-ellipsis">{{ description }}</span>
             </div>
 
             <div class="head-actions">
-              <n-popover
-                v-model:show="showSessions"
-                trigger="click"
-                placement="bottom-end"
-                :show-arrow="false"
-                raw
-              >
-                <template #trigger>
-                  <button type="button" class="head-btn" title="历史对话">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button type="button" class="head-btn" @click="showSessions = true">
                     <i class="ri-history-line" />
                     <span v-if="chat.hasHistory" class="badge">{{ chat.sessions.length }}</span>
                   </button>
-                </template>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">历史对话</TooltipContent>
+              </Tooltip>
 
-                <div class="session-panel">
-                  <div class="panel-head">历史对话</div>
-
-                  <div v-if="chat.sessions.length === 0" class="panel-empty">
-                    这张表还没有对话记录
-                  </div>
-
-                  <div v-else class="panel-list ds-scroll-y">
-                    <button
-                      v-for="s in chat.sessions"
-                      :key="s.id"
-                      type="button"
-                      class="session-item"
-                      :class="{ active: s.id === chat.sessionId }"
-                      @click="pickSession(s.id)"
-                    >
-                      <span class="session-title ds-ellipsis">{{ s.title || '未命名对话' }}</span>
-                      <span class="session-meta">
-                        {{ s.message_count }} 条 · {{ formatRelativeTime(s.updated_at) }}
-                      </span>
-                    </button>
-                  </div>
-
-                  <button type="button" class="panel-new" @click="startNewSession">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button type="button" class="head-btn" @click="startNewSession">
                     <i class="ri-add-line" />
-                    新建对话
                   </button>
-                </div>
-              </n-popover>
-
-              <button type="button" class="head-btn" title="新建对话" @click="startNewSession">
-                <i class="ri-add-line" />
-              </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">新建对话</TooltipContent>
+              </Tooltip>
             </div>
           </header>
 
@@ -319,17 +286,7 @@ async function handleUndoMessage(messageId: string) {
           </ChatPanel>
         </div>
 
-        <div
-          class="col-resizer"
-          role="separator"
-          aria-orientation="vertical"
-          :class="{ dragging: resizing }"
-          @pointerdown="onResizeDown"
-        />
-
         <SpecCanvas
-          :title="title"
-          :description="description"
           :items="spec.items"
           :highlight-ids="spec.highlightIds"
           :revision="revision"
@@ -339,7 +296,6 @@ async function handleUndoMessage(messageId: string) {
           @update-item="handleUpdateItem"
           @add-item="handleAddItem"
           @remove-item="handleRemoveItem"
-          @rename="handleRename"
           @share="showShare = true"
           @remove="handleRemoveTable"
           @undo="handleUndo"
@@ -349,7 +305,7 @@ async function handleUndoMessage(messageId: string) {
 
       <div v-else class="loading">
         <p>参数表不存在</p>
-        <n-button size="small" @click="router.replace({ name: 'tables' })">返回列表</n-button>
+        <Button size="sm" variant="outline" @click="router.replace({ name: 'tables' })">返回列表</Button>
       </div>
     </main>
 
@@ -359,6 +315,75 @@ async function handleUndoMessage(messageId: string) {
       :table-id="spec.table.id"
       :table-title="spec.table.title"
     />
+
+    <!-- 历史对话 -->
+    <Dialog v-model:open="showSessions">
+      <DialogContent class="sm:max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle>历史对话</DialogTitle>
+          <DialogDescription>切换到之前的对话，或新建一段对话</DialogDescription>
+        </DialogHeader>
+
+        <div v-if="chat.sessions.length === 0" class="panel-empty">
+          这张表还没有对话记录
+        </div>
+
+        <div v-else class="panel-list ds-scroll-y">
+          <button
+            v-for="s in chat.sessions"
+            :key="s.id"
+            type="button"
+            class="session-item"
+            :class="{ active: s.id === chat.sessionId }"
+            @click="pickSession(s.id)"
+          >
+            <span class="session-title ds-ellipsis">{{ s.title || '未命名对话' }}</span>
+            <span class="session-meta">
+              {{ s.message_count }} 条 · {{ formatRelativeTime(s.updated_at) }}
+            </span>
+          </button>
+        </div>
+
+        <div class="panel-actions">
+          <Button variant="outline" @click="startNewSession">
+            <i class="ri-add-line" />
+            新建对话
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <!-- 删除参数 -->
+    <AlertDialog :open="!!removingItem" @update:open="(v) => !v && (removingItem = null)">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>删除参数</AlertDialogTitle>
+          <AlertDialogDescription>
+            确定删除「{{ removingItem?.name }}」？删除会记录为一个新版本，之后仍可撤销。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="removingItem = null">取消</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" @click="confirmRemoveItem">删除</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <!-- 删除参数表 -->
+    <AlertDialog :open="removingTable" @update:open="(v) => !v && (removingTable = false)">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>删除参数表</AlertDialogTitle>
+          <AlertDialogDescription>
+            确定删除「{{ spec.table?.title }}」？删除后该表不再出现在列表里。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="removingTable = false">取消</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" @click="confirmRemoveTable">删除</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
 
@@ -387,7 +412,7 @@ async function handleUndoMessage(messageId: string) {
   justify-content: center;
   gap: 12px;
   color: var(--ds-text-tertiary);
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
 }
 
 .workspace {
@@ -398,35 +423,12 @@ async function handleUndoMessage(messageId: string) {
 }
 
 .chat-col {
-  flex: none;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-}
-
-.col-resizer {
-  flex: none;
-  width: 7px;
-  position: relative;
-  z-index: 5;
-  cursor: col-resize;
-}
-
-.col-resizer::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 3px;
-  width: 1px;
-  background: var(--ds-border);
-  transition: background-color 0.16s ease;
-}
-
-.col-resizer:hover::before,
-.col-resizer.dragging::before {
-  background: var(--ds-primary);
 }
 
 .chat-head {
@@ -436,27 +438,7 @@ async function handleUndoMessage(messageId: string) {
   gap: 10px;
   height: 56px;
   padding: 0 14px 0 22px;
-  border-bottom: 1px solid var(--ds-border);
   background: var(--ds-surface);
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  flex: none;
-  border-radius: 50%;
-  background: #18a058;
-}
-
-.dot.busy {
-  background: var(--ds-primary);
-  animation: pulse 1.1s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.35;
-  }
 }
 
 .head-text {
@@ -468,13 +450,44 @@ async function handleUndoMessage(messageId: string) {
 }
 
 .head-title {
-  font-size: 14px;
+  font-size: var(--ds-font-md);
   font-weight: 600;
   color: var(--ds-text);
+  line-height: 1.3;
+}
+
+/*
+ * 与 .title-input 共用同一套盒模型（同内边距、同边框宽度、同行高），
+ * 编辑态切换时不会有位移或高度跳变；这里用透明边框先把 1px 占住。
+ * margin-left = 左内边距 + 边框宽，使静止态文字与 head-text 左缘对齐。
+ */
+.head-title.clickable {
+  cursor: text;
+  border: 1px solid transparent;
+  padding: 4px 10px;
+  margin-left: -11px;
+}
+
+.head-title.clickable:hover {
+  background: var(--ds-surface-muted);
+}
+
+.title-input {
+  width: 100%;
+  font-size: var(--ds-font-md);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ds-text);
+  border: 1px solid var(--ds-border-strong);
+  padding: 4px 10px;
+  margin-left: -11px;
+  outline: none;
+  background: var(--ds-surface);
+  font-family: inherit;
 }
 
 .head-sub {
-  font-size: 11.5px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
 }
 
@@ -495,7 +508,7 @@ async function handleUndoMessage(messageId: string) {
   border-radius: 8px;
   background: transparent;
   color: var(--ds-text-secondary);
-  font-size: 15px;
+  font-size: var(--ds-font-base);
   cursor: pointer;
 }
 
@@ -515,37 +528,22 @@ async function handleUndoMessage(messageId: string) {
   place-items: center;
   border-radius: 8px;
   background: var(--ds-primary);
-  color: #fff;
-  font-size: 10px;
+  color: var(--ds-primary-foreground);
+  font-size: var(--ds-font-xs);
   line-height: 1;
 }
 
-/* ---------- 历史对话面板 ---------- */
-
-.session-panel {
-  width: 300px;
-  padding: 8px;
-  border: 1px solid var(--ds-border);
-  border-radius: 12px;
-  background: var(--ds-surface);
-  box-shadow: 0 12px 32px rgba(18, 22, 34, 0.14);
-}
-
-.panel-head {
-  padding: 4px 8px 8px;
-  font-size: 11.5px;
-  color: var(--ds-text-tertiary);
-}
+/* ---------- 历史对话弹窗 ---------- */
 
 .panel-empty {
-  padding: 18px 8px;
+  padding: 24px 8px;
   text-align: center;
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
 }
 
 .panel-list {
-  max-height: 288px;
+  max-height: 320px;
 }
 
 .session-item {
@@ -553,7 +551,7 @@ async function handleUndoMessage(messageId: string) {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 7px 8px;
+  padding: 8px 10px;
   margin-bottom: 2px;
   border: none;
   border-radius: 8px;
@@ -571,7 +569,7 @@ async function handleUndoMessage(messageId: string) {
 }
 
 .session-title {
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
   color: var(--ds-text);
 }
 
@@ -581,29 +579,14 @@ async function handleUndoMessage(messageId: string) {
 }
 
 .session-meta {
-  font-size: 11px;
+  font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
 }
 
-.panel-new {
-  width: 100%;
+.panel-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 6px;
-  padding: 8px;
-  border: 1px solid var(--ds-border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ds-text-secondary);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.panel-new:hover {
-  border-color: var(--ds-primary);
-  color: var(--ds-primary);
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 
 /* 空态引导由 ChatPanel 的 empty 插槽渲染在滚动区内 */

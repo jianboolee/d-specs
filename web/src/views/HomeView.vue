@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { NButton } from 'naive-ui'
 
 import AppSidebar from '@/components/AppSidebar.vue'
 import BrandMark from '@/components/BrandMark.vue'
+import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth'
 import { useSpecTableStore } from '@/stores/specTable'
 
@@ -43,16 +43,16 @@ function goCreate() {
         <p class="tagline">用对话的方式，为每个产品维护一份参数表</p>
 
         <div class="actions">
-          <n-button type="primary" size="large" @click="goTables">
-            <template #icon><i class="ri-file-list-3-line" /></template>
+          <Button size="lg" @click="goTables">
+            <i class="ri-file-list-line" />
             我的参数表
             <span v-if="tableCount > 0" class="count">{{ tableCount }}</span>
-          </n-button>
+          </Button>
 
-          <n-button size="large" quaternary @click="goCreate">
-            <template #icon><i class="ri-add-line" /></template>
+          <Button size="lg" variant="outline" @click="goCreate">
+            <i class="ri-add-line" />
             新建参数表
-          </n-button>
+          </Button>
         </div>
 
         <ul class="points">
@@ -93,7 +93,7 @@ function goCreate() {
 
 .hero {
   margin: auto;
-  max-width: 560px;
+  max-width: 768px;
   padding: 48px 28px 64px;
   text-align: center;
 }
@@ -115,7 +115,7 @@ function goCreate() {
 
 .tagline {
   margin: 0 0 30px;
-  font-size: 14px;
+  font-size: var(--ds-font-md);
   line-height: 1.8;
   color: var(--ds-text-secondary);
 }
@@ -133,7 +133,7 @@ function goCreate() {
   padding: 0 7px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.22);
-  font-size: 12px;
+  font-size: var(--ds-font-xs);
   line-height: 1.7;
 }
 
@@ -166,13 +166,13 @@ function goCreate() {
 .point strong {
   display: block;
   margin-bottom: 3px;
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
   font-weight: 600;
   color: var(--ds-text);
 }
 
 .point span {
-  font-size: 11.5px;
+  font-size: var(--ds-font-xs);
   line-height: 1.65;
   color: var(--ds-text-tertiary);
 }

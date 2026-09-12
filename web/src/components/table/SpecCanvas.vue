@@ -2,11 +2,14 @@
 import { computed, nextTick, ref } from 'vue'
 
 import type { SpecItem } from '@/types/api'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 const props = withDefaults(
   defineProps<{
-    title: string
-    description?: string
     items: SpecItem[]
     highlightIds?: string[]
     revision?: number
@@ -31,7 +34,6 @@ const emit = defineEmits<{
     draft: { name: string; value: string; group_name: string; value_type: 'text' | 'number' },
   ]
   'remove-item': [itemId: string, name: string]
-  rename: [title: string]
   share: []
   remove: []
   undo: []
@@ -112,24 +114,6 @@ function confirmAdd() {
   addingGroup.value = null
 }
 
-// ---------- 标题编辑 ----------
-
-const titleDraft = ref('')
-const editingTitle = ref(false)
-
-function startRename() {
-  if (props.readonly) return
-  titleDraft.value = props.title
-  editingTitle.value = true
-}
-
-function commitRename() {
-  editingTitle.value = false
-  const next = titleDraft.value.trim()
-  if (!next || next === props.title) return
-  emit('rename', next)
-}
-
 function isHighlighted(id: string) {
   return props.highlightIds.includes(id)
 }
@@ -138,46 +122,75 @@ function isHighlighted(id: string) {
 <template>
   <section class="canvas">
     <header class="canvas-head">
-      <div class="canvas-title">
-        <input
-          v-if="editingTitle"
-          v-model="titleDraft"
-          class="title-input"
-          @blur="commitRename"
-          @keydown.enter.prevent="commitRename"
-          @keydown.esc="editingTitle = false"
-        />
-        <h3 v-else class="ds-ellipsis" :class="{ clickable: !readonly }" @click="startRename">
-          {{ title }}
-        </h3>
-        <span v-if="description" class="ds-ellipsis canvas-desc">{{ description }}</span>
-      </div>
+      <span v-if="saving" class="saving">
+        <i class="ri-loader-4-line spin" />
+        保存中
+      </span>
+      <span v-else class="revision">版本: r{{ revision }}</span>
 
       <div class="canvas-actions">
-        <span v-if="saving" class="saving">
-          <i class="ri-loader-4-line spin" />
-          保存中
-        </span>
-        <span v-else class="revision" :title="`当前版本 r${revision}`">r{{ revision }}</span>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <!-- disabled 按钮不派发 pointer 事件，用 span 承接指针命中 -->
+            <span class="tip-wrap">
+              <button
+                type="button"
+                class="ghost-btn icon-only"
+                :disabled="readonly || !canUndo"
+                aria-label="撤销"
+                @click="emit('undo')"
+              >
+                <i class="ri-arrow-go-back-line" />
+              </button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">撤销</TooltipContent>
+        </Tooltip>
 
-        <button type="button" class="ghost-btn" :disabled="readonly || !canUndo" @click="emit('undo')">
-          <i class="ri-arrow-go-back-line" /> 撤销
-        </button>
-        <button type="button" class="ghost-btn" :disabled="readonly || !canRedo" @click="emit('redo')">
-          <i class="ri-arrow-go-forward-line" /> 重做
-        </button>
-        <button v-if="!readonly" type="button" class="ghost-btn" @click="emit('share')">
-          <i class="ri-share-line" /> 分享
-        </button>
-        <button
-          v-if="!readonly"
-          type="button"
-          class="ghost-btn danger"
-          title="删除这张参数表"
-          @click="emit('remove')"
-        >
-          <i class="ri-delete-bin-line" />
-        </button>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <span class="tip-wrap">
+              <button
+                type="button"
+                class="ghost-btn icon-only"
+                :disabled="readonly || !canRedo"
+                aria-label="重做"
+                @click="emit('redo')"
+              >
+                <i class="ri-arrow-go-forward-line" />
+              </button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">重做</TooltipContent>
+        </Tooltip>
+
+        <Tooltip v-if="!readonly">
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="ghost-btn icon-only"
+              aria-label="分享"
+              @click="emit('share')"
+            >
+              <i class="ri-share-line" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">分享</TooltipContent>
+        </Tooltip>
+
+        <Tooltip v-if="!readonly">
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="ghost-btn danger icon-only"
+              aria-label="删除这张参数表"
+              @click="emit('remove')"
+            >
+              <i class="ri-delete-bin-line" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">删除这张参数表</TooltipContent>
+        </Tooltip>
       </div>
     </header>
 
@@ -271,65 +284,26 @@ function isHighlighted(id: string) {
 
 <style scoped>
 .canvas {
-  flex: 1;
+  /* 画布固定宽度：多余空间全部留给左侧对话栏，浏览器宽度变化时只影响聊天区 */
+  flex: none;
+  width: 460px;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background: var(--ds-surface);
+  border-left: 1px solid var(--ds-border);
 }
 
 .canvas-head {
   flex: none;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   padding: 0 18px;
   height: 56px;
-  border-bottom: 1px solid var(--ds-border);
-}
-
-.canvas-title {
-  flex: 1;
-  min-width: 0;
-}
-
-.canvas-title h3 {
-  margin: 0;
-  font-size: 14.5px;
-  font-weight: 600;
-  color: var(--ds-text);
-}
-
-.canvas-title h3.clickable {
-  cursor: text;
-  border-radius: 5px;
-  padding: 1px 4px;
-  margin-left: -4px;
-}
-
-.canvas-title h3.clickable:hover {
-  background: var(--ds-surface-muted);
-}
-
-.title-input {
-  width: 100%;
-  font-size: 14.5px;
-  font-weight: 600;
-  color: var(--ds-text);
-  border: 1px solid var(--ds-primary);
-  border-radius: 6px;
-  padding: 2px 6px;
-  outline: none;
-  background: var(--ds-surface);
-  font-family: inherit;
-}
-
-.canvas-desc {
-  display: block;
-  font-size: 12px;
-  color: var(--ds-text-tertiary);
 }
 
 .canvas-actions {
@@ -341,18 +315,23 @@ function isHighlighted(id: string) {
 
 .revision,
 .saving {
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: var(--ds-surface-muted);
   color: var(--ds-text-tertiary);
-  font-size: 11.5px;
+  font-size: var(--ds-font-xs);
   font-variant-numeric: tabular-nums;
+}
+
+/* 版本号只作说明文字，无背景无内边距 */
+.revision {
+  user-select: none;
 }
 
 .saving {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--ds-surface-muted);
   color: var(--ds-primary);
 }
 
@@ -370,30 +349,49 @@ function isHighlighted(id: string) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 9px;
-  border: 1px solid var(--ds-border);
+  padding: 6px 12px;
   border-radius: 8px;
-  background: transparent;
+  background: var(--ds-surface-muted);
   color: var(--ds-text-secondary);
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
   cursor: pointer;
 }
 
 .ghost-btn:hover:not(:disabled) {
-  border-color: var(--ds-primary);
-  color: var(--ds-primary);
+  background: var(--ds-border);
+  color: var(--ds-text);
 }
 
 .ghost-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  /* 指针事件交给外层 .tip-wrap，禁用时 tooltip 仍可弹出 */
+  pointer-events: none;
+}
+
+/* 去掉文案后的图标按钮：收成与 chat-head 一致的方形热区 */
+.ghost-btn.icon-only {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  justify-content: center;
+  font-size: var(--ds-font-base);
+}
+
+/* 承接被禁用按钮的指针事件（见模板注释） */
+.tip-wrap {
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.tip-wrap:has(> .ghost-btn:disabled) {
+  cursor: not-allowed;
 }
 
 /* 危险操作：平时中性，悬停才显红，避免误点 */
 .ghost-btn.danger:hover:not(:disabled) {
-  border-color: #d64545;
+  background: rgba(214, 69, 69, 0.1);
   color: #d64545;
-  background: rgba(214, 69, 69, 0.08);
 }
 
 .canvas-body {
@@ -414,7 +412,7 @@ function isHighlighted(id: string) {
 
 .canvas-empty p {
   margin: 12px 0 18px;
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
   line-height: 1.8;
 }
 
@@ -423,17 +421,16 @@ function isHighlighted(id: string) {
   align-items: center;
   gap: 5px;
   padding: 7px 14px;
-  border: 1px solid var(--ds-border);
   border-radius: 9px;
-  background: var(--ds-surface);
+  background: var(--ds-surface-muted);
   color: var(--ds-text-secondary);
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
   cursor: pointer;
 }
 
 .empty-add:hover {
-  border-color: var(--ds-primary);
-  color: var(--ds-primary);
+  background: var(--ds-border);
+  color: var(--ds-text);
 }
 
 .group {
@@ -445,14 +442,14 @@ function isHighlighted(id: string) {
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
   font-weight: 500;
   color: var(--ds-text-secondary);
 }
 
 .group-head i {
   color: var(--ds-text-tertiary);
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
 }
 
 .group-count {
@@ -460,7 +457,7 @@ function isHighlighted(id: string) {
   border-radius: 20px;
   background: var(--ds-surface-muted);
   color: var(--ds-text-tertiary);
-  font-size: 11px;
+  font-size: var(--ds-font-xs);
   font-weight: 400;
 }
 
@@ -478,7 +475,7 @@ function isHighlighted(id: string) {
   padding: 7px 12px;
   background: var(--ds-surface-muted);
   color: var(--ds-text-tertiary);
-  font-size: 11.5px;
+  font-size: var(--ds-font-xs);
   font-weight: 500;
   text-align: left;
 }
@@ -519,7 +516,7 @@ function isHighlighted(id: string) {
   background: transparent;
   color: var(--ds-text);
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
   outline: none;
 }
 
@@ -532,7 +529,6 @@ function isHighlighted(id: string) {
 }
 
 .cell-input:focus {
-  border-color: var(--ds-primary);
   background: var(--ds-surface);
 }
 
@@ -549,7 +545,7 @@ function isHighlighted(id: string) {
   border-radius: 6px;
   background: transparent;
   color: var(--ds-text-tertiary);
-  font-size: 13px;
+  font-size: var(--ds-font-sm);
   cursor: pointer;
   opacity: 0;
 }
@@ -568,18 +564,17 @@ function isHighlighted(id: string) {
   align-items: center;
   gap: 5px;
   margin-top: 7px;
-  padding: 5px 10px;
-  border: 1px dashed var(--ds-border-strong);
+  padding: 6px 12px;
   border-radius: 8px;
-  background: transparent;
-  color: var(--ds-text-tertiary);
-  font-size: 12.5px;
+  background: var(--ds-surface-muted);
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-font-xs);
   cursor: pointer;
 }
 
 .add-row:hover {
-  border-color: var(--ds-primary);
-  color: var(--ds-primary);
+  background: var(--ds-border);
+  color: var(--ds-text);
 }
 
 .new-row {
@@ -610,16 +605,16 @@ function isHighlighted(id: string) {
 .confirm-btn,
 .cancel-btn {
   flex: none;
-  padding: 5px 11px;
+  padding: 6px 14px;
   border-radius: 7px;
-  font-size: 12.5px;
+  font-size: var(--ds-font-xs);
   cursor: pointer;
   border: 1px solid transparent;
 }
 
 .confirm-btn {
   background: var(--ds-primary);
-  color: #fff;
+  color: var(--ds-primary-foreground);
 }
 
 .confirm-btn:disabled {
