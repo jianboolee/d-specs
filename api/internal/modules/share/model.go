@@ -37,8 +37,8 @@ type StatusView struct {
 // PublicSpec 公开只读页的数据。
 //
 // 刻意用一套独立的精简结构，而不是复用 spec 的详情响应：
-// 分享页只需要「分组 + 参数名 / 值 / 单位」，表 id 与参数项 id 都不该暴露给
-// 拿到链接的外部访客 —— 它们对展示毫无用处。
+// 分享页只需要「分组 + 参数名 / 值 / 单位」；参数项 id 对展示毫无用处，
+// 不该暴露给外部访客。表 id 则体现在公开 URL（/s/:id）上，不在这里重复返回。
 type PublicSpec struct {
 	Title       string        `json:"title"`
 	Description string        `json:"description"`
@@ -57,4 +57,11 @@ type PublicItem struct {
 	Value     string `json:"value"`
 	ValueType string `json:"value_type"`
 	Remark    string `json:"remark,omitempty"`
+}
+
+// SitemapEntry 已公开（分享开启中）的参数表，用于生成 sitemap.xml。
+type SitemapEntry struct {
+	ID        string    `gorm:"column:id"`
+	Title     string    `gorm:"column:title"`
+	UpdatedAt time.Time `gorm:"column:updated_at"`
 }

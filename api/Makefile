@@ -11,7 +11,7 @@ export GOCACHE
 
 ## 开发
 
-dev: ## 开发模式启动（Air 热重载，默认 :8300）
+dev: ## 开发模式启动（Air 热重载，默认 :8401）
 	@command -v $(AIR) >/dev/null 2>&1 || { \
 		echo "air not found. Install with: make air-install"; \
 		exit 1; \

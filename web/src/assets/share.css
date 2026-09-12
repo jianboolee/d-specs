@@ -1,0 +1,184 @@
+/*
+ * 分享页样式（全局）。
+ *
+ * 为什么放在全局而不是 ShareView.vue 的 <style scoped>：
+ * scoped 样式会被编译成带 data-v-xxx 属性的选择器，而分享页的 SEO 是
+ * 服务端注入的静态 HTML（见 api/internal/modules/share/page.go），它没有这个
+ * 属性，匹配不到 scoped 规则，首屏会以无样式状态渲染、等 Vue 接管后才重排。
+ *
+ * 所有规则收敛在 .share-page 命名空间下：share 页用到的 group / tag / dot
+ * 都是通用类名，直接全局会污染 Tailwind 的 group 以及其它页面的同名类。
+ */
+
+.share-page {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--ds-bg);
+}
+
+.share-page .share-main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 44px 20px 28px;
+}
+
+.share-page .state {
+  padding: 72px 0;
+  text-align: center;
+  color: var(--ds-text-tertiary);
+  font-size: var(--ds-font-sm);
+}
+
+.share-page .state.error i {
+  font-size: 36px;
+}
+
+.share-page .state.error h1 {
+  margin: 14px 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ds-text);
+}
+
+.share-page .state.error p {
+  margin: 0;
+  font-size: var(--ds-font-sm);
+}
+
+.share-page .state-hint {
+  margin-top: 6px !important;
+  font-size: var(--ds-font-xs) !important;
+  color: var(--ds-text-tertiary);
+}
+
+.share-page .spec-head {
+  margin-bottom: 30px;
+}
+
+.share-page .spec-head h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ds-text);
+  letter-spacing: -0.2px;
+}
+
+.share-page .spec-desc {
+  margin: 0 0 12px;
+  font-size: var(--ds-font-sm);
+  line-height: 1.75;
+  color: var(--ds-text-secondary);
+}
+
+.share-page .spec-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--ds-font-xs);
+  color: var(--ds-text-tertiary);
+}
+
+.share-page .tag {
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--ds-primary-soft);
+  color: var(--ds-primary);
+}
+
+.share-page .dot {
+  color: var(--ds-border-strong);
+}
+
+.share-page .group {
+  margin-bottom: 26px;
+}
+
+.share-page .group h2 {
+  margin: 0 0 10px;
+  font-size: var(--ds-font-sm);
+  font-weight: 600;
+  color: var(--ds-text-secondary);
+}
+
+.share-page .spec-list {
+  margin: 0;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-surface);
+  overflow: hidden;
+}
+
+.share-page .spec-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 13px 16px;
+}
+
+.share-page .spec-row + .spec-row {
+  border-top: 1px solid var(--ds-border);
+}
+
+.share-page .spec-row dt {
+  flex: 0 0 42%;
+  font-size: var(--ds-font-sm);
+  color: var(--ds-text-secondary);
+}
+
+.share-page .spec-row dd {
+  flex: 1;
+  margin: 0;
+  font-size: var(--ds-font-md);
+  font-weight: 500;
+  color: var(--ds-text);
+}
+
+.share-page .spec-value.empty {
+  color: var(--ds-text-tertiary);
+  font-weight: 400;
+  font-style: italic;
+}
+
+.share-page .share-foot {
+  padding: 0 20px 40px;
+  text-align: center;
+  font-size: var(--ds-font-xs);
+  color: var(--ds-text-tertiary);
+}
+
+@media (max-width: 560px) {
+  .share-page .share-main {
+    padding: 22px 14px 40px;
+  }
+
+  .share-page .spec-head {
+    margin-bottom: 24px;
+  }
+
+  .share-page .spec-head h1 {
+    font-size: 20px;
+  }
+
+  /*
+   * 移动端保持左右两列结构：两侧同时收紧内边距、列间距和字号，
+   * 并允许长参数名/值换行，避免固定 42% 列宽下内容被挤压或横向溢出。
+   */
+  .share-page .spec-row {
+    gap: 10px;
+    padding: 11px 12px;
+  }
+
+  .share-page .spec-row dt {
+    flex: 0 0 40%;
+    font-size: var(--ds-font-xs);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+
+  .share-page .spec-row dd {
+    font-size: var(--ds-font-sm);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+}

@@ -7,7 +7,7 @@
 ```bash
 cp .env.example .env      # 填入 DEEPSEEK_API_KEY
 make migrate              # 建表
-make dev                  # 启动（:8300，热重载）
+make dev                  # 启动（:8401，热重载）
 ```
 
 首次需要确保 `dspecs` 库存在（共享的 postgres18 实例）：
@@ -21,7 +21,7 @@ docker exec -e PGPASSWORD=postgres postgres18 \
 
 | 命令 | 说明 |
 |------|------|
-| `make dev` | 开发模式启动（Air 热重载，默认 :8300） |
+| `make dev` | 开发模式启动（Air 热重载，默认 :8401） |
 | `make migrate` | 执行 SQL migration（默认 up） |
 | `make migrate-down` | 回退最近一次迁移 |
 | `make ai-check` | 验证 DeepSeek 连通性与 function calling |
@@ -160,7 +160,12 @@ GET    /api/v1/sessions/:sid/messages   会话消息
 GET    /api/v1/tables/:id/share         分享状态
 POST   /api/v1/tables/:id/share         开启分享
 DELETE /api/v1/tables/:id/share         关闭分享
-GET    /api/v1/public/specs/:token      公开只读内容（无需鉴权）
+GET    /api/v1/public/specs/:id         公开只读内容（无需鉴权，key 兼容表 id 与历史 token）
+
+# 公开页面（SEO，挂在根路径而非 /api 下）
+GET    /s/:id                           分享页 HTML（服务端渲染，可被搜索引擎收录）
+GET    /sitemap.xml                     分享开启中的表，动态生成
+GET    /robots.txt                      放行 /s/，屏蔽应用内部路由与 /api/
 ```
 
 统一响应体：

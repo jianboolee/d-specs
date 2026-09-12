@@ -65,5 +65,7 @@ func Setup(engine *gin.Engine, d *deps.Deps) {
 	// AI 变更必须与手工变更共用同一套执行器，分享要复用同一套归属校验
 	specSvc := spec.Register(v1, d)
 	chat.Register(v1, d, specSvc)
-	share.Register(v1, d, specSvc)
+	// engine 也要传进去：分享页 /s/:id 与 sitemap / robots 挂在根路径，
+	// 而不是 /api/v1 下
+	share.Register(engine, v1, d, specSvc)
 }

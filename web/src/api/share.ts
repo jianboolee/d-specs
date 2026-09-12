@@ -15,6 +15,7 @@ export function disableShare(tableId: string) {
 }
 
 /** 公开只读内容，无需鉴权 */
-export function getPublicSpec(token: string) {
-  return request<PublicSpec>(`/public/specs/${token}`)
+/** 公开只读内容，无需鉴权。key 为表 id（历史 token 亦可） */
+export function getPublicSpec(id: string) {
+  return request<PublicSpec>(`/public/specs/${id}`)
 }

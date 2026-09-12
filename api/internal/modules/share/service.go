@@ -76,9 +76,9 @@ func (s *Service) Disable(ctx context.Context, userID, tableID string) (*StatusV
 
 // ==================== 公开访问 ====================
 
-// PublicSpec 按 token 取只读内容。无需登录。
-func (s *Service) PublicSpec(ctx context.Context, token string) (*PublicSpec, error) {
-	link, err := s.repo.resolveByToken(ctx, token)
+// PublicSpec 按表 id 取只读内容。无需登录。
+func (s *Service) PublicSpec(ctx context.Context, tableID string) (*PublicSpec, error) {
+	link, err := s.repo.resolveByTableID(ctx, tableID)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +103,23 @@ func (s *Service) PublicSpec(ctx context.Context, token string) (*PublicSpec, er
 		UpdatedAt:   table.UpdatedAt,
 		Groups:      groupRows(rows),
 	}, nil
+}
+
+// TableIDByToken 用旧版 token 反查表 id。
+//
+// 曾经公开地址是 /s/<token>，现在改为 /s/<表id> 以便被搜索引擎收录与分享。
+// 这个函数只服务于「把历史链接 301 到规范地址」，不是常规读取路径。
+func (s *Service) TableIDByToken(ctx context.Context, token string) (string, error) {
+	link, err := s.repo.resolveByToken(ctx, token)
+	if err != nil {
+		return "", err
+	}
+	return link.TableID, nil
+}
+
+// ListPublicTables 已公开的表，用于生成 sitemap.xml。
+func (s *Service) ListPublicTables(ctx context.Context) ([]SitemapEntry, error) {
+	return s.repo.ListPublicTables(ctx)
 }
 
 func groupRows(rows []publicItemRow) []PublicGroup {
@@ -134,8 +151,9 @@ func toStatusView(link *ShareLink) *StatusView {
 	}
 	if link.Enabled {
 		view.Token = link.Token
-		// 前端用 location.origin 拼成完整地址
-		view.URL = "/s/" + link.Token
+		// 公开地址用表 id，便于被搜索引擎收录与人工识别。
+		// 前端用 location.origin 拼成完整地址。
+		view.URL = "/s/" + link.TableID
 	}
 	return view
 }

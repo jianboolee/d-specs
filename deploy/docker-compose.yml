@@ -27,10 +27,15 @@ services:
 
     environment:
       APP_ENV: production
-      HTTP_PORT: "8300"
+      HTTP_PORT: "8401"
 
       # 对外 URL 前缀。与应用同域时留空。
       PUBLIC_URL_BASE: ${PUBLIC_URL_BASE:-}
+
+      # 分享页 SEO：站点规范地址与站点名。SITE_URL 建议填对外域名，
+      # 让 canonical / OG / sitemap 稳定（留空则按请求头推导）。
+      SITE_URL: ${SITE_URL:-}
+      SITE_NAME: ${SITE_NAME:-参数配置表}
 
       # 库名/用户/端口由下面 postgres 服务定义，这里按服务名拼接，无需手写整条 URL。
       # 注意：密码若含 @ : / ? # 等字符需先做 URL 编码，否则会解析失败。
@@ -60,7 +65,7 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
 
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "${APP_PORT:-8400}:80"
 
     # 镜像内已定义 HEALTHCHECK（打后端 /health），这里不再重复
 

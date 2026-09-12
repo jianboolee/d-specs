@@ -14,6 +14,18 @@
 | 后端 | Go + Gin + GORM + PostgreSQL |
 | AI | DeepSeek（首版只接 Flash 档位） |
 
+## 端口约定
+
+本项目独占 **8400–8402**，刻意避开 Vite 默认的 5173 与常见的 8080，减少与本机其它项目
+冲突。所有端口都可用环境变量覆盖（`API_PORT` / `WEB_PORT` / `APP_PORT`）。
+
+| 端口 | 用途 | 说明 |
+|------|------|------|
+| `8400` | 应用对外端口 | 宿主机 → 容器 80；生产外层 nginx 按此转发（`APP_PORT`） |
+| `8401` | API | 本地 `make api-dev`；生产时仅容器内监听，不对外发布（`HTTP_PORT`） |
+| `8402` | Web dev | Vite dev server（`WEB_PORT`） |
+| `80` | 容器内 nginx | 仅容器内部，不直接暴露 |
+
 ## 目录
 
 ```
@@ -39,21 +51,58 @@ docker exec -e PGPASSWORD=postgres postgres18 \
 cd api
 cp .env.example .env        # 填入 DEEPSEEK_API_KEY
 make migrate                # 建表
-make dev                    # :8300
+make dev                    # :8401
 
 # 前端（另开终端）
 cd web
 npm install --cache ./.npm-cache
-npm run dev                 # :5173，已配置 /api 代理到 8300
+npm run dev                 # :8402，已配置 /api、/s/ 代理到 8401
 ```
 
-访问 http://localhost:5173 ，用演示账号 `demo@dspecs.dev` / `demo12345` 登录。
+访问 http://localhost:8402 ，用演示账号 `demo@dspecs.dev` / `demo12345` 登录。
+
+> 不想在本机装 Go / Node、或想要容器化的热重载环境，见
+> [本地开发：容器化热重载](#本地开发容器化热重载make-docker-dev)。
 
 登录后落在欢迎页，点「我的参数表」进入列表，再点任意一张表进入工作区。
 
 工作区里右侧画布可以直接改参数名和参数值；左侧对话框里也可以直接说
 「加一个参数：电池容量 5000mAh，分组续航」，AI 会自动应用改动并高亮
 变化的位置，随时可以撤销。画布右上角的「分享」可以生成只读链接。
+
+## 分享页与 SEO
+
+开启分享后，公开地址是 `/s/<表id>`（例如 `https://specs.21rv.com/s/01a094a2-...`）。
+这些页面**是公开可收录的**：任何拿到链接的人都能访问，搜索引擎也可以抓取和检索。
+
+为了让不执行 JS 的爬虫（百度、微信/飞书的链接预览）也能读到内容，分享页由
+**后端直出 HTML**：`GET /s/:id` 会查库后把 `<title>`、description、OG 卡片、
+canonical、JSON-LD 以及参数正文一起渲染进入口 HTML 再返回（见
+`api/internal/modules/share/page.go`）。Vue 挂载后接管为交互页面，首屏数据由
+服务端内联注入，不会出现无样式闪烁或重复请求。
+
+配套的公开入口：
+
+| 路径 | 说明 |
+|------|------|
+| `GET /s/:id` | 分享页 HTML（SSR）。分享未开启或不存在时返回 **404 + noindex**，便于从索引中摘除 |
+| `GET /sitemap.xml` | 动态列出所有分享开启中的表，便于搜索引擎发现 |
+| `GET /robots.txt` | 放行 `/s/`，屏蔽 `/tables`、`/login`、`/api/` |
+| `GET /api/v1/public/specs/:id` | 前端使用的 JSON 接口，key 兼容表 id 与历史 token |
+
+历史地址 `/s/<token>` 会 **301** 重定向到 `/s/<表id>`，已发出去的旧链接继续可用。
+
+相关配置（见 `api/.env.example`）：
+
+- `SITE_URL`：站点规范地址，用于 canonical / OG / sitemap。生产建议显式配置，
+  留空则按请求头 `X-Forwarded-Proto` / `Host` 推导。
+- `SITE_NAME`：站点名，用于标题后缀与 OG `site_name`。
+- `WEB_DIST_DIR`：SSR 读取入口 HTML 的目录。容器内为 `/usr/share/nginx/html`；
+  本地配 `npm run dev` 时用 `../web`（`index.html` 引用 `/src/main.ts`，由 vite 提供）；
+  验证「构建产物 + 后端」链路时用 `../web/dist`（需先 `npm run build`）。
+
+> 容器内 nginx 已把 `/s/`、`/sitemap.xml`、`/robots.txt` 反代给后端（见
+> `docker/nginx.conf`）；外部站点 nginx 无需额外配置。
 
 ## 验证 AI 连通性
 
@@ -99,7 +148,7 @@ PostgreSQL 是**外部依赖**，通过环境变量注入（变量清单见 `api
 容器启动时默认自动执行数据库迁移，可用 `RUN_MIGRATIONS=false` 关闭：
 
 ```bash
-docker run -d -p 8080:80 --name dspecs \
+docker run -d -p 8400:80 --name dspecs \
   -e DATABASE_URL="postgresql://user:pass@host:5432/dspecs?sslmode=disable" \
   -e JWT_SECRET="<openssl rand -base64 48 | tr -d '/+='>" \
   -e DEEPSEEK_API_KEY="<key>" \
@@ -113,13 +162,65 @@ docker run -d -p 8080:80 --name dspecs \
 docker run --rm -e DATABASE_URL="..." jianboo/d-specs:v1.0.0 migrate up
 ```
 
-本地试跑可直接 `make docker-run`（需要 `DATABASE_URL` / `JWT_SECRET`
-/ `DEEPSEEK_API_KEY` 已在当前 shell 环境里；从宿主机访问数据库时把 host 写成
-`host.docker.internal`）。
+本地试跑可直接 `make docker-run`，默认映射 8400，被占用时覆盖：
+`make docker-run APP_PORT=8490`。
+
+它的环境变量有两个来源，**优先级从高到低**：
+
+1. `api/.env.docker`（存在时自动使用，推荐）。照 `api/.env.docker.example` 复制一份即可。
+2. 当前 shell 里 `export` 过的 `DATABASE_URL` / `JWT_SECRET` / `DEEPSEEK_API_KEY`。
+
+> ⚠️ **不要用 `--env-file api/.env`（或把 `api/.env` 复制成 `.env.docker`）**。
+> `api/.env` 是「后端直接跑在宿主机」的配置，其中 `APP_ENV=development` 和
+> `WEB_DIST_DIR=../web` 在容器里是错的：前者让镜像跑成开发模式，后者指向容器内
+> 不存在的路径、使分享页 SSR 退化成没有入口脚本的兜底页。
+>
+> 另外 `docker run` **不会**读 `api/.env` —— 读 `.env` 是 `docker compose` 的行为。
+> 镜像内已烘焙 `APP_ENV=production` / `HTTP_PORT=8401` /
+> `WEB_DIST_DIR=/usr/share/nginx/html` / `RUN_MIGRATIONS=true`，无需手工传。
+>
+> 容器里的 `localhost` 指容器自己，连宿主机数据库要写 `host.docker.internal`。
+> 本地试跑若不想让容器对目标库执行迁移，在 `.env.docker` 里设 `RUN_MIGRATIONS=false`。
+
+发布镜像是按 `DOCKER_PLATFORMS`（默认 `linux/amd64`）交叉构建的，在 Apple Silicon
+上跑会有架构不匹配的提示（走 Rosetta 模拟，能跑但慢）。本地开发请用下面的
+`make docker-dev`，它按宿主架构构建、且是热重载。
 
 镜像内置健康检查，直接打后端 `/health`（而非 nginx），避免把「nginx 活着、
 后端已挂」误判为健康。容器内任一时间只有一个 API 与一个 nginx 进程，任一
 意外退出都会让容器整体退出，交由编排系统重启。
+
+## 本地开发：容器化热重载（make docker-dev）
+
+不依赖本机装 Go / Node，也不用每次改代码都重新构建镜像：
+
+```bash
+make docker-dev        # 起 api(air 热重载) + web(vite HMR)，访问 :8402
+make docker-dev-logs   # 跟踪日志
+make docker-dev-down   # 停
+```
+
+- **api**：`api/Dockerfile.dev`（只含 Go + air 工具链，不含源码）+ 挂载 `./api`，
+  改 `.go` 文件由 air 自动重编译重启。
+- **web**：`node:22-alpine` + 挂载 `./web`，vite dev 自带 HMR，改前端即时生效。
+- **分享页去 `http://localhost:8402/s/<表id>`** 即可看到 SSR 的 meta 与正文
+  （vite 已把 `/s/`、`/sitemap.xml`、`/robots.txt` 代理给 api）。
+
+数据库沿用你 `api/.env` 的配置（compose 不覆盖 `DATABASE_URL`）：
+
+- `.env` 连的是远程库 → 容器可直连，无需改动。
+- `.env` 是 `localhost:5432` → 容器里的 `localhost` 指它自己，需改成
+  `host.docker.internal:5432`（Mac/Windows）。
+
+两个注意事项：
+
+- **不要与宿主机的 `make api-dev` / `make web-dev` 同时跑**：`docker-dev` 会占用
+  8401 / 8402，会与热重载服务抢端口。冲突时用
+  `API_PORT=8411 WEB_PORT=8412 make docker-dev`。
+- 若 HMR 不触发（绑定挂载收不到文件事件），用 `DS_VITE_POLL=1 make docker-dev`
+  退回轮询。
+
+发布验证仍走 `make docker-run`（真正的发布镜像 + 容器内 nginx），两者用途不同。
 
 ## 用 docker compose 部署（自建服务器）
 
@@ -139,7 +240,7 @@ cp .env.example .env     # 至少填 POSTGRES_PASSWORD 与 JWT_SECRET
 docker compose up -d
 ```
 
-默认访问 `http://<服务器>:8080`。`deploy/.env` 已在 `.gitignore` 中，不会被提交。
+默认访问 `http://<服务器>:8400`。`deploy/.env` 已在 `.gitignore` 中，不会被提交。
 
 ### 方案二：只用应用 + 现有数据库（Portainer 推荐）
 

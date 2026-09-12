@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1
+
+# ============================================================
+# 本地开发专用的 API 镜像
+#
+# 与根目录的发布 Dockerfile 不同：这个镜像只提供「能跑 Go + air」的环境，
+# 源码通过 docker-compose.dev.yml 绑定挂载进来，改代码触发 air 重编译，
+# 不需要重新构建镜像。
+#
+# 构建在宿主架构上（Mac 用 arm64），不涉及 --platform 交叉构建。
+# ============================================================
+FROM golang:1.25-alpine
+
+# air 拉取依赖模块时需要 git
+RUN apk add --no-cache git
+
+# 预装 air。刻意锁版本而不是用 @latest：
+# air v1.67.4 起要求 Go >= 1.26，而 golang:1.25 镜像自带 1.25.x，@latest 会直接构建失败。
+# 这一层会被缓存，升级 air 时同步核对它要求的最低 Go 版本。
+ARG AIR_VERSION=v1.66.0
+RUN go install github.com/air-verse/air@${AIR_VERSION}
+
+WORKDIR /src

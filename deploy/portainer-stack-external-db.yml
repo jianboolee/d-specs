@@ -33,7 +33,7 @@ services:
 
     environment:
       APP_ENV: production
-      HTTP_PORT: "8300"
+      HTTP_PORT: "8401"
 
       # 指向现有 PostgreSQL（完整连接串，由 Portainer 环境变量注入）
       DATABASE_URL: ${DATABASE_URL:?请设置 DATABASE_URL，例如 postgresql://user:pass@host:5432/dspecs?sslmode=disable}
@@ -60,10 +60,14 @@ services:
       AUTO_CREATE_DB: ${AUTO_CREATE_DB:-false}
 
       PUBLIC_URL_BASE: ${PUBLIC_URL_BASE:-}
+
+      # 分享页 SEO：站点规范地址与站点名（SITE_URL 建议填对外域名）
+      SITE_URL: ${SITE_URL:-}
+      SITE_NAME: ${SITE_NAME:-参数配置表}
       TZ: ${TZ:-Asia/Shanghai}
 
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "${APP_PORT:-8400}:80"
 
     # 让 host.docker.internal 在 Linux 上也解析到宿主机（连宿主上的库时需要）
     extra_hosts:

@@ -33,8 +33,12 @@ services:
 
     environment:
       APP_ENV: production
-      HTTP_PORT: "8300"
+      HTTP_PORT: "8401"
       PUBLIC_URL_BASE: ${PUBLIC_URL_BASE:-}
+
+      # 分享页 SEO：站点规范地址与站点名（SITE_URL 建议填对外域名）
+      SITE_URL: ${SITE_URL:-}
+      SITE_NAME: ${SITE_NAME:-参数配置表}
 
       DATABASE_URL: postgresql://${POSTGRES_USER:-dspecs}:${POSTGRES_PASSWORD:?请在 Portainer 环境变量面板设置 POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-dspecs}?sslmode=disable
 
@@ -58,7 +62,7 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
 
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "${APP_PORT:-8400}:80"
 
   postgres:
     image: postgres:18-alpine

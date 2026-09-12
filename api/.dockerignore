@@ -1,0 +1,10 @@
+# 构建上下文只用于 Dockerfile.dev（它不 COPY 任何源码，源码靠挂载）。
+# 排除大目录，避免每次 build 都把这些内容传给 daemon。
+node_modules
+.gocache
+.npm-cache
+bin
+tmp
+.env
+.env.*
+http-client.private.env.json

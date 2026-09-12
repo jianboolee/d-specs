@@ -35,9 +35,18 @@ type Config struct {
 	AppEnv        string
 	HTTPPort      string
 	PublicURLBase string
-	DatabaseURL   string
-	JWTSecret     string
-	JWTExpire     time.Duration
+	// SiteName 站点名，用于分享页 <title> 后缀、OG site_name 与 JSON-LD
+	SiteName string
+	// SiteURL 站点规范地址（如 https://specs.21rv.com），用于分享页 canonical / OG。
+	// 留空则按请求的 X-Forwarded-Proto / Host 推导；生产建议显式配置，避免
+	// canonical 依赖可被伪造的请求头。
+	SiteURL string
+	// WebDistDir 前端构建产物目录。分享页 SSR 会读取其中的 index.html
+	// 注入 meta 与正文；容器内即 nginx 的站点根目录。
+	WebDistDir  string
+	DatabaseURL string
+	JWTSecret   string
+	JWTExpire   time.Duration
 
 	// AutoCreateDB 运行迁移前自动创建 DATABASE_URL 指向的库。
 	// 仅用于首次部署（实例存在但库还没建）；默认关闭，避免库名写错时
@@ -55,8 +64,13 @@ func Load() (*Config, error) {
 	_ = viper.ReadInConfig()
 
 	viper.SetDefault("APP_ENV", "development")
-	viper.SetDefault("HTTP_PORT", "8300")
+	viper.SetDefault("HTTP_PORT", "8401")
 	viper.SetDefault("PUBLIC_URL_BASE", "")
+	viper.SetDefault("SITE_NAME", "参数配置表")
+	// 站点规范地址。留空则按请求头推导；生产建议设置，让 canonical/OG 稳定。
+	viper.SetDefault("SITE_URL", "")
+	// 容器内前端产物挂在 nginx 站点根目录；本地跑后端时可用 WEB_DIST_DIR 指向 web/dist
+	viper.SetDefault("WEB_DIST_DIR", "/usr/share/nginx/html")
 	viper.SetDefault("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/dspecs?sslmode=disable")
 	// 首次部署时设为 true 可自动建库，之后建议改回 false
 	viper.SetDefault("AUTO_CREATE_DB", false)
@@ -79,6 +93,9 @@ func Load() (*Config, error) {
 		AppEnv:        strings.TrimSpace(viper.GetString("APP_ENV")),
 		HTTPPort:      strings.TrimSpace(viper.GetString("HTTP_PORT")),
 		PublicURLBase: strings.TrimRight(strings.TrimSpace(viper.GetString("PUBLIC_URL_BASE")), "/"),
+		SiteName:      strings.TrimSpace(viper.GetString("SITE_NAME")),
+		SiteURL:       strings.TrimRight(strings.TrimSpace(viper.GetString("SITE_URL")), "/"),
+		WebDistDir:    strings.TrimSpace(viper.GetString("WEB_DIST_DIR")),
 		DatabaseURL:   strings.TrimSpace(viper.GetString("DATABASE_URL")),
 		AutoCreateDB:  viper.GetBool("AUTO_CREATE_DB"),
 		JWTSecret:     viper.GetString("JWT_SECRET"),

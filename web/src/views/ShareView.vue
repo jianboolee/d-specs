@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import * as shareApi from '@/api/share'
@@ -11,14 +11,24 @@ import type { PublicSpec } from '@/types/api'
  *
  * 刻意不引入 AppSidebar / ChatPanel / 编辑器组件：这个页面通过独立路由懒加载，
  * 外部访客不该为编辑器与对话面板付出 bundle 代价。
+ *
+ * 公开地址用表 id（/s/:id）。页面本身是公开可收录的，SEO 元信息与正文由后端
+ * 在 SSR 时就已经写进入口 HTML；这里只负责 Vue 接管后的交互渲染。
  */
 const route = useRoute()
 
-const loading = ref(true)
-const spec = ref<PublicSpec | null>(null)
-const errorText = ref('')
+const tableId = computed(() => String(route.params.id ?? ''))
 
-const token = computed(() => String(route.params.token ?? ''))
+/**
+ * 服务端 SSR 时已注入的数据（见 api/internal/modules/share/page.go）。
+ * 用它作为初始状态：Vue 接管后无需再请求一次接口，也不会出现
+ * 「完整内容 → 加载中 → 完整内容」的闪烁。
+ */
+const seed = readSeed()
+
+const loading = ref(!seed)
+const spec = ref<PublicSpec | null>(seed)
+const errorText = ref('')
 
 const totalItems = computed(() =>
   spec.value ? spec.value.groups.reduce((sum, g) => sum + g.items.length, 0) : 0,
@@ -31,17 +41,16 @@ const updatedAt = computed(() => {
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
 })
 
-// 分享页可能被转发，不该进搜索引擎索引
-let metaRobots: HTMLMetaElement | null = null
-
 onMounted(async () => {
-  metaRobots = document.createElement('meta')
-  metaRobots.name = 'robots'
-  metaRobots.content = 'noindex, nofollow'
-  document.head.appendChild(metaRobots)
+  // 已有 SSR 数据就直接展示，不必再打一次接口；
+  // 直接访问（无 SSR，例如前端 dev server）时才回退到接口拉取。
+  if (spec.value) {
+    document.title = spec.value.title || '参数配置表'
+    return
+  }
 
   try {
-    spec.value = await shareApi.getPublicSpec(token.value)
+    spec.value = await shareApi.getPublicSpec(tableId.value)
     document.title = spec.value.title || '参数配置表'
   } catch (err) {
     errorText.value =
@@ -51,9 +60,16 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => {
-  metaRobots?.remove()
-})
+/** 读取服务端注入的初始数据；不存在或格式异常时返回 null */
+function readSeed(): PublicSpec | null {
+  const el = document.getElementById('__SHARE_SPEC__')
+  if (!el?.textContent) return null
+  try {
+    return JSON.parse(el.textContent) as PublicSpec
+  } catch {
+    return null
+  }
+}
 </script>
 
 <template>
@@ -101,178 +117,3 @@ onUnmounted(() => {
     <footer class="share-foot">由小野驴科技提供技术支持</footer>
   </div>
 </template>
-
-<style scoped>
-.share-page {
-  height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  background: var(--ds-bg);
-}
-
-.share-main {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 44px 20px 28px;
-}
-
-.state {
-  padding: 72px 0;
-  text-align: center;
-  color: var(--ds-text-tertiary);
-  font-size: var(--ds-font-sm);
-}
-
-.state.error i {
-  font-size: 36px;
-}
-
-.state.error h1 {
-  margin: 14px 0 8px;
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--ds-text);
-}
-
-.state.error p {
-  margin: 0;
-  font-size: var(--ds-font-sm);
-}
-
-.state-hint {
-  margin-top: 6px !important;
-  font-size: var(--ds-font-xs) !important;
-  color: var(--ds-text-tertiary);
-}
-
-.spec-head {
-  margin-bottom: 30px;
-}
-
-.spec-head h1 {
-  margin: 0 0 6px;
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--ds-text);
-  letter-spacing: -0.2px;
-}
-
-.spec-desc {
-  margin: 0 0 12px;
-  font-size: var(--ds-font-sm);
-  line-height: 1.75;
-  color: var(--ds-text-secondary);
-}
-
-.spec-meta {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: var(--ds-font-xs);
-  color: var(--ds-text-tertiary);
-}
-
-.tag {
-  padding: 2px 8px;
-  border-radius: 20px;
-  background: var(--ds-primary-soft);
-  color: var(--ds-primary);
-}
-
-.dot {
-  color: var(--ds-border-strong);
-}
-
-.group {
-  margin-bottom: 26px;
-}
-
-.group h2 {
-  margin: 0 0 10px;
-  font-size: var(--ds-font-sm);
-  font-weight: 600;
-  color: var(--ds-text-secondary);
-}
-
-.spec-list {
-  margin: 0;
-  border: 1px solid var(--ds-border);
-  border-radius: var(--ds-radius-lg);
-  background: var(--ds-surface);
-  overflow: hidden;
-}
-
-.spec-row {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  padding: 13px 16px;
-}
-
-.spec-row + .spec-row {
-  border-top: 1px solid var(--ds-border);
-}
-
-.spec-row dt {
-  flex: 0 0 42%;
-  font-size: var(--ds-font-sm);
-  color: var(--ds-text-secondary);
-}
-
-.spec-row dd {
-  flex: 1;
-  margin: 0;
-  font-size: var(--ds-font-md);
-  font-weight: 500;
-  color: var(--ds-text);
-}
-
-.spec-value.empty {
-  color: var(--ds-text-tertiary);
-  font-weight: 400;
-  font-style: italic;
-}
-
-.share-foot {
-  padding: 0 20px 40px;
-  text-align: center;
-  font-size: var(--ds-font-xs);
-  color: var(--ds-text-tertiary);
-}
-
-@media (max-width: 560px) {
-  .share-main {
-    padding: 22px 14px 40px;
-  }
-
-  .spec-head {
-    margin-bottom: 24px;
-  }
-
-  .spec-head h1 {
-    font-size: 20px;
-  }
-
-  /*
-   * 移动端保持左右两列结构：两侧同时收紧内边距、列间距和字号，
-   * 并允许长参数名/值换行，避免固定 42% 列宽下内容被挤压或横向溢出。
-   */
-  .spec-row {
-    gap: 10px;
-    padding: 11px 12px;
-  }
-
-  .spec-row dt {
-    flex: 0 0 40%;
-    font-size: var(--ds-font-xs);
-    line-height: 1.6;
-    overflow-wrap: anywhere;
-  }
-
-  .spec-row dd {
-    font-size: var(--ds-font-sm);
-    line-height: 1.6;
-    overflow-wrap: anywhere;
-  }
-}
-</style>

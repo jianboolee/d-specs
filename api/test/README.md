@@ -46,7 +46,7 @@ http-client.private.env.json   token 等（已 gitignore）
 
 | 变量 | 说明 |
 |------|------|
-| `baseUrl` | 默认 `http://localhost:8300` |
+| `baseUrl` | 默认 `http://localhost:8401` |
 | `email` | 测试账号邮箱，默认 `demo@dspecs.dev` |
 | `token` | `make http-sync` 自动填充 |
 | `userId` | `make http-sync` 自动填充 |
@@ -54,7 +54,7 @@ http-client.private.env.json   token 等（已 gitignore）
 `sync-env.sh` 支持用环境变量覆盖：
 
 ```bash
-DS_BASE_URL=http://localhost:8300 DS_TEST_EMAIL=me@example.com make http-sync
+DS_BASE_URL=http://localhost:8401 DS_TEST_EMAIL=me@example.com make http-sync
 ```
 
 ## 新增接口

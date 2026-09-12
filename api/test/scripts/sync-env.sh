@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-BASE_URL="${DS_BASE_URL:-http://localhost:8300}"
+BASE_URL="${DS_BASE_URL:-http://localhost:8401}"
 EMAIL="${DS_TEST_EMAIL:-demo@dspecs.dev}"
 PASSWORD="${DS_TEST_PASSWORD:-demo12345}"
 NAME="${DS_TEST_NAME:-测试账号}"

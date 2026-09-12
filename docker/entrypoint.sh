@@ -36,7 +36,7 @@ else
   echo "[entrypoint] skipping migrations (RUN_MIGRATIONS=${RUN_MIGRATIONS})"
 fi
 
-echo "[entrypoint] starting api server on :${HTTP_PORT:-8300}"
+echo "[entrypoint] starting api server on :${HTTP_PORT:-8401}"
 "$SERVER_BIN" &
 server_pid=$!
 

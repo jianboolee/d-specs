@@ -29,8 +29,9 @@ const router = createRouter({
       component: () => import('@/views/WorkspaceView.vue'),
     },
     {
-      // 分享页：独立路由，走独立懒加载 chunk，不加载编辑器与对话面板
-      path: '/s/:token',
+      // 分享页：独立路由，走独立懒加载 chunk，不加载编辑器与对话面板。
+      // 公开地址用表 id，便于被搜索引擎收录与人工识别。
+      path: '/s/:id',
       name: 'share',
       component: () => import('@/views/ShareView.vue'),
       meta: { public: true, layout: 'standalone' },

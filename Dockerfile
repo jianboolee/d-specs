@@ -5,7 +5,11 @@
 #
 #   前端：Vite 构建 web/dist，运行时由 nginx 托管
 #   后端：Go 编译 server / migrate 两个静态二进制
-#   运行时：nginx 监听 80，/api 与 /health 反代到 127.0.0.1:8300
+#   运行时：nginx 监听 80（对外经 APP_PORT=8400 映射），
+#           /api、/health、/s/（分享页 SSR）反代到 127.0.0.1:8401
+#
+# 分享页 /s/<id> 由 Go 读取站点根目录的 index.html 注入 meta 与正文，
+# 因此 WEB_DIST_DIR 指向 nginx 站点根目录（见下方 ENV）。
 #
 # PostgreSQL 是外部依赖，通过环境变量注入（见 api/.env.example）
 # ============================================================
@@ -54,15 +58,19 @@ COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
 # 配置一律走环境变量（config 使用 viper.AutomaticEnv，不依赖 .env 文件）
+# HTTP_PORT 是容器内 API 端口（与 dev 的 8401 一致），只监听回环，不对外发布；
+# 对外端口由 docker-compose 的 APP_PORT（8400）映射到容器的 80。
+# WEB_DIST_DIR 指向 nginx 站点根目录，分享页 SSR 从这里读取入口 HTML
 ENV APP_ENV=production \
-    HTTP_PORT=8300 \
+    HTTP_PORT=8401 \
+    WEB_DIST_DIR=/usr/share/nginx/html \
     RUN_MIGRATIONS=true
 
 EXPOSE 80
 
 # 探针直接打后端 /health，避免把「nginx 活着但后端已挂」当成健康
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
-    CMD wget -qO- http://127.0.0.1:8300/health >/dev/null 2>&1 || exit 1
+    CMD wget -qO- http://127.0.0.1:8401/health >/dev/null 2>&1 || exit 1
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["serve"]

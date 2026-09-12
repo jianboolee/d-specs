@@ -1,4 +1,7 @@
 .env
+# 容器试跑用的环境文件含密钥，绝不入库；保留模板供他人复制
+.env.docker
+!.env.docker.example
 bin/
 tmp/
 tmp/build-errors.log

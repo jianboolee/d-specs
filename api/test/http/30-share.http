@@ -1,5 +1,8 @@
 # @name share
-# @description 分享：开启 / 公开读取 / 关闭
+# @description 分享：开启 / 公开读取 / SSR 页面 / 关闭
+#
+# 公开地址用表 id（/s/<tableId>），便于被搜索引擎收录；历史 /s/<token> 会
+# 301 到规范地址，token 也仍可走 API 兜底解析。
 #
 # 注意 httpYac 的坑详见 test/README.md。
 
@@ -9,7 +12,7 @@ POST {{baseUrl}}/api/v1/tables
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
-{ "title": "分享测试表" }
+{ "title": "分享测试表", "description": "用于验证分享与 SEO" }
 
 ?? status == 201
 
@@ -45,11 +48,18 @@ Authorization: Bearer {{token}}
 
 ?? status == 200
 ?? js response.parsedBody.data.enabled == true
-?? js response.parsedBody.data.token != undefined
+?? js response.parsedBody.data.url != undefined
 
 {{
   exports.shareToken = response.parsedBody.data.token;
 }}
+
+### 公开地址应是 /s/<表id>，而不是 token
+GET {{baseUrl}}/api/v1/tables/{{shareTableId}}/share
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? js response.parsedBody.data.url == /s/{{shareTableId}}
 
 ### 表的可见性应变为 link
 GET {{baseUrl}}/api/v1/tables/{{shareTableId}}
@@ -58,8 +68,8 @@ Authorization: Bearer {{token}}
 ?? status == 200
 ?? body data.table.visibility == link
 
-### 公开读取：无需任何鉴权
-GET {{baseUrl}}/api/v1/public/specs/{{shareToken}}
+### 公开读取：按表 id，无需任何鉴权
+GET {{baseUrl}}/api/v1/public/specs/{{shareTableId}}
 
 ?? status == 200
 ?? js response.parsedBody.data.title == 分享测试表
@@ -68,17 +78,57 @@ GET {{baseUrl}}/api/v1/public/specs/{{shareToken}}
 ?? js response.parsedBody.data.groups[0].items[0].name == 电池容量
 ?? js response.parsedBody.data.groups[0].items[0].value == 5000mAh
 
-### 公开响应不应暴露表 id 与参数项 id
+### 历史 token 仍可兜底解析（兼容已发出的旧链接）
 GET {{baseUrl}}/api/v1/public/specs/{{shareToken}}
+
+?? status == 200
+?? js response.parsedBody.data.title == 分享测试表
+
+### 公开响应不应暴露参数项 id
+GET {{baseUrl}}/api/v1/public/specs/{{shareTableId}}
 
 ?? status == 200
 ?? js response.parsedBody.data.id == undefined
 ?? js response.parsedBody.data.groups[0].items[0].id == undefined
 
-### 无效 token —— 应 404
-GET {{baseUrl}}/api/v1/public/specs/definitely-not-a-real-token
+### 无效 key —— 应 404
+GET {{baseUrl}}/api/v1/public/specs/definitely-not-a-real-key
 
 ?? status == 404
+
+### 分享页 SSR：不执行 JS 也应能从 HTML 读到标题与正文
+GET {{baseUrl}}/s/{{shareTableId}}
+
+?? status == 200
+?? body contains 分享测试表
+?? body contains 电池容量
+?? body contains 5000mAh
+?? body contains rel="canonical"
+?? body contains application/ld+json
+
+### 分享页不应带 noindex（要允许收录）
+GET {{baseUrl}}/s/{{shareTableId}}
+
+?? status == 200
+?? body !contains noindex
+
+### 历史 /s/<token> 应 301 到 /s/<表id>
+GET {{baseUrl}}/s/{{shareToken}}
+
+?? status == 301
+?? header location == /s/{{shareTableId}}
+
+### sitemap.xml 应列出已公开的表
+GET {{baseUrl}}/sitemap.xml
+
+?? status == 200
+?? body contains /s/{{shareTableId}}
+
+### robots.txt 放行分享页
+GET {{baseUrl}}/robots.txt
+
+?? status == 200
+?? body contains Allow: /s/
 
 ### 再次开启分享应复用同一个 token
 POST {{baseUrl}}/api/v1/tables/{{shareTableId}}/share
@@ -94,10 +144,16 @@ Authorization: Bearer {{token}}
 ?? status == 200
 ?? js response.parsedBody.data.enabled == false
 
-### 关闭后公开链接立即失效
-GET {{baseUrl}}/api/v1/public/specs/{{shareToken}}
+### 关闭后公开接口立即失效
+GET {{baseUrl}}/api/v1/public/specs/{{shareTableId}}
 
 ?? status == 404
+
+### 关闭后分享页应 404（便于从搜索索引中摘除）
+GET {{baseUrl}}/s/{{shareTableId}}
+
+?? status == 404
+?? body contains noindex
 
 ### 可见性回到 private
 GET {{baseUrl}}/api/v1/tables/{{shareTableId}}

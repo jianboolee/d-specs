@@ -15,7 +15,7 @@ tmp_dir = "tmp"
   full_bin = ""
   include_dir = []
   include_ext = ["go", "tpl", "tmpl", "html"]
-  # 等待旧进程优雅退出后再启动新进程，避免 :8300 address already in use
+  # 等待旧进程优雅退出后再启动新进程，避免 :8401 address already in use
   kill_delay = "0s"
   log = "tmp/build-errors.log"
   poll = false

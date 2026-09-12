@@ -286,7 +286,10 @@ POST   /api/v1/ai/operations/:id/reject
 # 分享（首版）
 POST   /api/v1/tables/:id/shares           生成 / 获取只读链接（幂等）
 DELETE /api/v1/tables/:id/shares           关闭分享
-GET    /api/v1/public/specs/:token         公开只读，无需鉴权
+GET    /api/v1/public/specs/:id            公开只读，无需鉴权（id 兼容历史 token）
+GET    /s/:id                              分享页 HTML（SSR，供搜索引擎收录）
+GET    /sitemap.xml                        分享开启中的表
+GET    /robots.txt                         爬虫规则
 
 # 模板（结构先留，P3 开放）
 GET    /api/v1/templates
@@ -372,10 +375,13 @@ event: done         {"usage":{"prompt":1200,"completion":300}}
 
 ### 端口与依赖
 
+本项目独占 8400–8402，避开 Vite 默认 5173 与常见 8080，减少与本机其它项目冲突。
+
 | 用途 | 地址 |
 |------|------|
-| 后端 | `:8300` |
-| 前端 dev | `:5173`（Vite 代理 `/api` → 8300） |
+| 应用对外（生产） | `:8400`（宿主机 → 容器 80，外层 nginx 按此转发） |
+| 后端 dev | `:8401`（`HTTP_PORT`；生产时仅容器内） |
+| 前端 dev | `:8402`（Vite 代理 `/api`、`/s/` → 8401） |
 | PostgreSQL | 复用 `~/Sites/docker/postgres18` 共享实例，库名 `dspecs` |
 
 ### 目录结构
@@ -454,7 +460,9 @@ src/
 - 前端：自研 SSE 客户端（POST + Bearer）、流式打字、工具调用可视化、
   改动摘要卡片、一键撤销
 - 对话 ↔ 画布联动：`applied` 到达后刷新画布并高亮变化项
-- **极简分享**：`share_links` + `GET /public/specs/:token` + 独立只读页
+- **极简分享**：`share_links` + `GET /public/specs/:id` + 独立只读页
+- **分享页 SEO**：公开地址用表 id（`/s/:id`），后端渲染 HTML（meta / OG /
+  JSON-LD / 正文），配 sitemap.xml 与 robots.txt；页面公开可被搜索引擎收录
 - 接口用例 32 项（分享 15 + 对话 12 + 其它）
 
 **几个落地时的判断：**
@@ -466,7 +474,9 @@ src/
 | 历史回放只带 user / assistant 文本，不回放 tool 回合 | 工具返回的是「当时那张表」，塞回上下文既占 token 又可能与当前状态冲突 |
 | 自研 SSE 客户端，不引 `@microsoft/fetch-event-source` | 只需要「按空行切块 + 取 event/data」这点功能，几十行换掉一个依赖 |
 | 分享 token 关闭后复用而非重新生成 | 否则「关闭再打开」会让已经发出去的链接失效 |
-| 公开接口返回独立的精简结构 | 表 id 与参数项 id 对展示毫无用处，不该暴露给拿到链接的外部访客 |
+| 公开地址用表 id 而非 token | 分享页要能被搜索引擎收录与人工识别，需要稳定的规范地址；历史 `/s/<token>` 301 到 `/s/<id>` 兼容旧链接 |
+| 分享页由后端渲染 HTML | 百度等爬虫不执行 JS，纯前端 SPA 只能抓到空壳；SSR 把 meta 与正文直接写进入口 HTML |
+| 公开接口返回独立的精简结构 | 参数项 id 对展示毫无用处，不该暴露给外部访客 |
 
 ### Phase 3+ —— 延后
 模板库与套用 · 导出 xlsx/pdf · 组织与 RBAC · 多人协作 · 分享增强（密码 / 有效期）· 用量看板
@@ -487,7 +497,7 @@ src/
 | 手工 / AI 行为不一致 | 逻辑割裂 | 共用同一个 `apply` 执行器（第 4 节） |
 | 自动应用误改用户数据 | 信任受损 | revision 快照 + 一键撤销 + 安全阀 + `ai_operations` 可追溯 |
 | 用户数据越权访问 | 严重事故 | repository 层强制 `user_id` 过滤 + 跨用户访问集成测试 |
-| 分享链接被爬 / 被索引 | 数据外泄 | token 用足够熵的随机串（不可枚举）；只读页带 `noindex`；关闭分享即时失效 |
+| 分享链接被爬 / 被过度索引 | 内容外泄 / 关闭后仍留在索引 | 公开是产品定位：页面明确可被搜索引擎收录。关闭分享后 `/s/:id` 与公开接口立即返回 404，页面带 `noindex`，过期内容会从索引中摘除 |
 
 ---
 
@@ -563,9 +573,9 @@ docker exec -e PGPASSWORD=postgres postgres18 \
 
 ```bash
 # 后端
-cd api && cp .env.example .env && make migrate && make dev     # :8300
+cd api && cp .env.example .env && make migrate && make dev     # :8401
 # 前端
-cd web && npm run dev                                          # :5173
+cd web && npm run dev                                          # :8402
 ```
 
 根目录 `make help` 列出全部常用命令。

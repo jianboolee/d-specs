@@ -104,9 +104,10 @@ function describe(err: unknown) {
           <div class="state-text">
             <strong>{{ enabled ? '分享已开启' : '分享未开启' }}</strong>
             <span v-if="enabled">
-              任何人拿到链接都可以查看，无需登录 · 已被访问 {{ status?.view_count ?? 0 }} 次
+              公开链接，任何人可查看、也可能被搜索引擎收录 · 已被访问
+              {{ status?.view_count ?? 0 }} 次
             </span>
-            <span v-else>开启后会生成一个只读链接，可随时关闭</span>
+            <span v-else>开启后会生成一个公开的只读链接，可随时关闭</span>
           </div>
           <Button :variant="enabled ? 'outline' : 'default'" :disabled="busy" @click="toggle">
             {{ enabled ? '关闭分享' : '开启分享' }}
@@ -120,7 +121,8 @@ function describe(err: unknown) {
         </div>
 
         <p class="share-tip">
-          关闭分享后原链接立即失效；再次开启会复用同一个链接，已发出去的不受影响。
+          页面公开可被搜索引擎收录。关闭分享后链接立即失效并返回 404；再次开启会
+          复用同一个链接，已发出去的不受影响。
         </p>
       </template>
 

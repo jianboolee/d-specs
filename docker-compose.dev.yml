@@ -1,0 +1,78 @@
+# ============================================================
+# d-specs 本地开发栈（热重载，不构建发布镜像）
+#
+#   用法：
+#     make docker-dev          # 起 api(air) + web(vite)
+#     make docker-dev-down     # 停
+#
+#   - api：api/Dockerfile.dev + 挂载 ./api，air 监听 .go 变化自动重编译
+#   - web：官方 node 镜像 + 挂载 ./web，vite dev 自带 HMR
+#   - 分享页 /s/ 通过 vite 代理到 api，SEO 注入在本地就能看到
+#
+# 端口：本项目约定 API=8401、Web=8402（见根 Makefile 的「端口约定」），
+# 容器内也用同一组端口，宿主机映射保持一致，避免多处出现不同数字。
+# 与其它项目冲突时用 API_PORT / WEB_PORT 覆盖（只改宿主机侧映射）。
+#
+# 数据库复用你 api/.env 里的配置，不在这里另起 PostgreSQL。
+#
+# 发布验证请用 `make docker-run`（跑真正的发布镜像），不要用这套。
+# ============================================================
+
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.dev
+    working_dir: /src
+    command: air -c .air.toml
+    volumes:
+      - ./api:/src
+      # 分享页 SSR 要读前端入口 HTML。挂源码目录（不是 dist）：
+      # 里面的 index.html 引用 /src/main.ts，正好由 web 容器的 vite 提供。
+      - ./web:/web:ro
+      # 缓存 Go 模块与编译产物，避免每次重建都重新下载
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    environment:
+      HTTP_PORT: "8401"
+      # 覆盖 api/.env 里的路径：容器内前端源码挂在 /web
+      WEB_DIST_DIR: /web
+      # canonical / OG 用浏览器实际访问的地址（宿主机侧 web 端口，随 WEB_PORT 变化）
+      SITE_URL: ${SITE_URL:-http://localhost:${WEB_PORT:-8402}}
+      SITE_NAME: 参数配置表
+      # 刻意不在这里设 DATABASE_URL：/src 是挂载进来的，容器会直接读你的 api/.env，
+      # 从而复用你原本的数据库配置。
+      #   - .env 里连的是远程库  -> 容器可直连，无需改动
+      #   - .env 里是 localhost  -> 容器内的 localhost 是它自己，需改成
+      #     host.docker.internal:5432（Mac/Windows）
+    ports:
+      # 容器内固定监听 8401；宿主机若被占用，用 API_PORT 覆盖宿主机侧
+      - "${API_PORT:-8401}:8401"
+    extra_hosts:
+      # Linux 下 host.docker.internal 需要显式映射；Mac/Windows 自带
+      - "host.docker.internal:host-gateway"
+
+  web:
+    image: node:22-alpine
+    working_dir: /web
+    # node_modules 用容器内的，不与宿主机混用（宿主机是 darwin/arm64 二进制，
+    # 直接挂进去会因平台不匹配报 esbuild 之类的错），所以装到命名卷
+    command: sh -c "npm ci --no-audit --no-fund && npm run dev"
+    volumes:
+      - ./web:/web
+      - web_node_modules:/web/node_modules
+    environment:
+      # vite 代理的后端地址：容器里用服务名，不能用 127.0.0.1
+      DS_API_TARGET: http://api:8401
+      # 若 HMR 不触发（绑定挂载收不到文件事件）可设为 1 改走轮询
+      DS_VITE_POLL: "${DS_VITE_POLL:-}"
+    ports:
+      # 容器内固定监听 8402（vite 默认值见 web/vite.config.ts）；宿主机若被占用，用 WEB_PORT 覆盖宿主机侧
+      - "${WEB_PORT:-8402}:8402"
+    depends_on:
+      - api
+
+volumes:
+  go_mod_cache:
+  go_build_cache:
+  web_node_modules:
