@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/donktech/d-specs/internal/app"
-	"github.com/donktech/d-specs/internal/config"
+	"github.com/jianboolee/d-specs/internal/app"
+	"github.com/jianboolee/d-specs/internal/config"
 )
 
 func main() {

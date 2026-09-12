@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/donktech/d-specs/internal/infrastructure/idgen"
-	"github.com/donktech/d-specs/pkg/quantity"
+	"github.com/jianboolee/d-specs/internal/infrastructure/idgen"
+	"github.com/jianboolee/d-specs/pkg/quantity"
 )
 
 // ValidationErrors 一次性收集全部校验问题。

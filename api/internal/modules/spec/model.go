@@ -3,8 +3,8 @@ package spec
 import (
 	"time"
 
-	"github.com/donktech/d-specs/internal/ai/ops"
-	"github.com/donktech/d-specs/pkg/quantity"
+	"github.com/jianboolee/d-specs/internal/ai/ops"
+	"github.com/jianboolee/d-specs/pkg/quantity"
 )
 
 // SpecTable 参数表。一张表 = 一个产品的参数配置表。

@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"github.com/donktech/d-specs/internal/deps"
-	"github.com/donktech/d-specs/internal/middleware"
+	"github.com/jianboolee/d-specs/internal/deps"
+	"github.com/jianboolee/d-specs/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )

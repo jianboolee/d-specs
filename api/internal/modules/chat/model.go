@@ -3,7 +3,7 @@ package chat
 import (
 	"time"
 
-	"github.com/donktech/d-specs/internal/ai/provider"
+	"github.com/jianboolee/d-specs/internal/ai/provider"
 )
 
 // 消息角色

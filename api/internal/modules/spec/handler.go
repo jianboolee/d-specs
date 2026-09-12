@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/donktech/d-specs/internal/contextx"
-	"github.com/donktech/d-specs/internal/response"
+	"github.com/jianboolee/d-specs/internal/contextx"
+	"github.com/jianboolee/d-specs/internal/response"
 
 	"github.com/gin-gonic/gin"
 )

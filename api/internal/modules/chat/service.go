@@ -6,11 +6,11 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/donktech/d-specs/internal/ai/agent"
-	"github.com/donktech/d-specs/internal/ai/ops"
-	"github.com/donktech/d-specs/internal/ai/provider"
-	"github.com/donktech/d-specs/internal/config"
-	"github.com/donktech/d-specs/internal/modules/spec"
+	"github.com/jianboolee/d-specs/internal/ai/agent"
+	"github.com/jianboolee/d-specs/internal/ai/ops"
+	"github.com/jianboolee/d-specs/internal/ai/provider"
+	"github.com/jianboolee/d-specs/internal/config"
+	"github.com/jianboolee/d-specs/internal/modules/spec"
 )
 
 // historyLimit 回放给模型的历史消息条数

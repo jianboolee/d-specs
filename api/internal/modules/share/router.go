@@ -1,9 +1,9 @@
 package share
 
 import (
-	"github.com/donktech/d-specs/internal/deps"
-	"github.com/donktech/d-specs/internal/middleware"
-	"github.com/donktech/d-specs/internal/modules/spec"
+	"github.com/jianboolee/d-specs/internal/deps"
+	"github.com/jianboolee/d-specs/internal/middleware"
+	"github.com/jianboolee/d-specs/internal/modules/spec"
 
 	"github.com/gin-gonic/gin"
 )

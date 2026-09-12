@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/donktech/d-specs/internal/infrastructure/idgen"
+	"github.com/jianboolee/d-specs/internal/infrastructure/idgen"
 
 	"gorm.io/gorm"
 )

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/donktech/d-specs/internal/config"
-	"github.com/donktech/d-specs/internal/infrastructure/database"
+	"github.com/jianboolee/d-specs/internal/config"
+	"github.com/jianboolee/d-specs/internal/infrastructure/database"
 
 	"gorm.io/gorm"
 )

@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/donktech/d-specs/internal/response"
+	"github.com/jianboolee/d-specs/internal/response"
 
 	"github.com/gin-gonic/gin"
 )

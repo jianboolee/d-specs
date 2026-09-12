@@ -1,4 +1,4 @@
-module github.com/donktech/d-specs
+module github.com/jianboolee/d-specs
 
 go 1.25.0
 

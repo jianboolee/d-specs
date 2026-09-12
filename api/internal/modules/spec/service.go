@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/donktech/d-specs/internal/ai/ops"
+	"github.com/jianboolee/d-specs/internal/ai/ops"
 )
 
 type Service struct {

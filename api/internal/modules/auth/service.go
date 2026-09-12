@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/donktech/d-specs/internal/infrastructure/auth"
-	"github.com/donktech/d-specs/internal/infrastructure/idgen"
+	"github.com/jianboolee/d-specs/internal/infrastructure/auth"
+	"github.com/jianboolee/d-specs/internal/infrastructure/idgen"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/donktech/d-specs/internal/ai/ops"
-	"github.com/donktech/d-specs/internal/infrastructure/database"
-	"github.com/donktech/d-specs/internal/infrastructure/idgen"
+	"github.com/jianboolee/d-specs/internal/ai/ops"
+	"github.com/jianboolee/d-specs/internal/infrastructure/database"
+	"github.com/jianboolee/d-specs/internal/infrastructure/idgen"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"

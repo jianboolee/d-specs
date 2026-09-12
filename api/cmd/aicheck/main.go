@@ -18,10 +18,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/donktech/d-specs/internal/ai/agent"
-	"github.com/donktech/d-specs/internal/ai/ops"
-	"github.com/donktech/d-specs/internal/ai/provider"
-	"github.com/donktech/d-specs/internal/config"
+	"github.com/jianboolee/d-specs/internal/ai/agent"
+	"github.com/jianboolee/d-specs/internal/ai/ops"
+	"github.com/jianboolee/d-specs/internal/ai/provider"
+	"github.com/jianboolee/d-specs/internal/config"
 )
 
 func main() {

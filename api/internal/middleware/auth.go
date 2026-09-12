@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/donktech/d-specs/internal/contextx"
-	infraauth "github.com/donktech/d-specs/internal/infrastructure/auth"
-	"github.com/donktech/d-specs/internal/response"
+	"github.com/jianboolee/d-specs/internal/contextx"
+	infraauth "github.com/jianboolee/d-specs/internal/infrastructure/auth"
+	"github.com/jianboolee/d-specs/internal/response"
 
 	"github.com/gin-gonic/gin"
 )

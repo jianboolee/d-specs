@@ -3,7 +3,7 @@ package spec
 import (
 	"time"
 
-	"github.com/donktech/d-specs/internal/ai/ops"
+	"github.com/jianboolee/d-specs/internal/ai/ops"
 )
 
 // ==================== 请求 ====================

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/donktech/d-specs/internal/contextx"
-	"github.com/donktech/d-specs/internal/modules/spec"
-	"github.com/donktech/d-specs/internal/response"
+	"github.com/jianboolee/d-specs/internal/contextx"
+	"github.com/jianboolee/d-specs/internal/modules/spec"
+	"github.com/jianboolee/d-specs/internal/response"
 
 	"github.com/gin-gonic/gin"
 )

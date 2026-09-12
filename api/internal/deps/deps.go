@@ -3,9 +3,9 @@ package deps
 import (
 	"log/slog"
 
-	"github.com/donktech/d-specs/internal/ai/provider"
-	"github.com/donktech/d-specs/internal/config"
-	infraauth "github.com/donktech/d-specs/internal/infrastructure/auth"
+	"github.com/jianboolee/d-specs/internal/ai/provider"
+	"github.com/jianboolee/d-specs/internal/config"
+	infraauth "github.com/jianboolee/d-specs/internal/infrastructure/auth"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"

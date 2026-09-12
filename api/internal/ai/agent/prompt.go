@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/donktech/d-specs/internal/ai/ops"
+	"github.com/jianboolee/d-specs/internal/ai/ops"
 )
 
 // maxInlineItems 直接把参数名清单塞进 system prompt 的上限。

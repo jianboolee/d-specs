@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/donktech/d-specs/internal/ai/ops"
-	"github.com/donktech/d-specs/internal/ai/provider"
+	"github.com/jianboolee/d-specs/internal/ai/ops"
+	"github.com/jianboolee/d-specs/internal/ai/provider"
 )
 
 // 工具名

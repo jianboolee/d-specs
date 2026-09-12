@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/donktech/d-specs/internal/modules/spec"
+	"github.com/jianboolee/d-specs/internal/modules/spec"
 )
 
 type Service struct {
