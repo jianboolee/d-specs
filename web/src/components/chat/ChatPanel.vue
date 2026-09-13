@@ -51,6 +51,16 @@ const suggestions = [
   '把这张表按分组重新整理一遍',
 ]
 
+/**
+ * 「表名建议」快捷指令。
+ *
+ * 明确要求「先不要改」：点击只是让 AI 说说怎么取更好，用户看完若想采用，
+ * 再点回复下方的建议动作。这样与直接改名区分开，用户点起来没负担。
+ */
+const TITLE_SUGGEST_PROMPT =
+  '根据表里的参数内容，看看当前表标题是否合适。如果可以用得更好，给出 2 到 3 个候选表名，' +
+  '并说明每个适合什么场景；先不要修改标题，等我确认。如果现在的标题已经不错，也直接说明理由。'
+
 /** 输入框随内容自动增高，超过上限后内部滚动 */
 const MAX_INPUT_HEIGHT = 148
 
@@ -251,7 +261,7 @@ function kindLabel(kind: ChatChange['kind']) {
     </div>
 
     <div class="composer">
-      <!-- 常驻入口：随时可以让 AI 通读这张表、指出还缺哪些关键参数 -->
+      <!-- 常驻入口：两个快捷操作，点击即发出一条对应指令 -->
       <div class="composer-actions">
         <button
           type="button"
@@ -262,6 +272,17 @@ function kindLabel(kind: ChatChange['kind']) {
         >
           <i :class="analyzing ? 'ri-loader-4-line spin' : 'ri-sparkling-2-line'" />
           完善参数表
+        </button>
+
+        <button
+          type="button"
+          class="action-chip"
+          :disabled="disabled || sending"
+          title="看看表名怎么取更好，AI 只给建议，不会直接改"
+          @click="emit('send', TITLE_SUGGEST_PROMPT)"
+        >
+          <i class="ri-text-wrap" />
+          表名建议
         </button>
       </div>
 
@@ -645,6 +666,7 @@ function kindLabel(kind: ChatChange['kind']) {
 /* 输入框上方的常驻快捷入口，与输入区左对齐 */
 .composer-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin: 0 2px 8px;
 }
