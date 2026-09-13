@@ -57,6 +57,26 @@ const title = computed(() => spec.table?.title ?? '')
 const description = computed(() => spec.table?.description ?? '')
 const revision = computed(() => spec.table?.current_revision ?? 0)
 
+// ---------- 置顶 ----------
+
+const pinned = computed(() => spec.table?.pinned === true)
+const pinBusy = ref(false)
+
+/** 置顶/取消置顶：侧栏与列表页共用同一份 spec.tables，刷新后顺序即时生效 */
+async function togglePin() {
+  const table = spec.table
+  if (!table || pinBusy.value) return
+  pinBusy.value = true
+  try {
+    await spec.setPinned(table.id, !pinned.value)
+    toast.success(pinned.value ? '已置顶' : '已取消置顶')
+  } catch (err) {
+    toast.error(err instanceof ApiError ? err.message : '操作失败')
+  } finally {
+    pinBusy.value = false
+  }
+}
+
 const showShare = ref(false)
 const showSessions = ref(false)
 
@@ -370,6 +390,10 @@ async function handleUndoMessage(messageId: string) {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" class="min-w-[150px]">
+                  <DropdownMenuItem @select="togglePin">
+                    <i :class="pinned ? 'ri-unpin-line' : 'ri-pushpin-line'" />
+                    {{ pinned ? '取消置顶' : '置顶' }}
+                  </DropdownMenuItem>
                   <DropdownMenuItem @select="openDuplicate">
                     <i class="ri-file-copy-line" />
                     创建副本

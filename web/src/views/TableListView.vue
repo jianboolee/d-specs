@@ -63,6 +63,16 @@ async function duplicate(table: TableSummary) {
   }
 }
 
+async function togglePin(table: TableSummary) {
+  const next = !table.pinned
+  try {
+    await spec.setPinned(table.id, next)
+    toast.success(next ? '已置顶' : '已取消置顶')
+  } catch (err) {
+    toast.error(describe(err))
+  }
+}
+
 // ---------- 重命名（Dialog + Input） ----------
 
 const renaming = ref<TableSummary | null>(null)
@@ -165,6 +175,10 @@ function describe(err: unknown) {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem @select="togglePin(table)">
+                    <i :class="table.pinned ? 'ri-unpin-line' : 'ri-pushpin-line'" />
+                    {{ table.pinned ? '取消置顶' : '置顶' }}
+                  </DropdownMenuItem>
                   <DropdownMenuItem @select="open(table)">
                     <i class="ri-arrow-right-up-line" />
                     打开

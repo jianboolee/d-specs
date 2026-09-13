@@ -40,6 +40,8 @@ export interface UpdateTableInput {
   title?: string
   description?: string
   industry?: string
+  /** 用户级置顶开关 */
+  pinned?: boolean
 }
 
 export function updateTable(id: string, input: UpdateTableInput) {

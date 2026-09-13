@@ -93,6 +93,17 @@ export const useSpecTableStore = defineStore('specTable', () => {
     return updated
   }
 
+  /** 置顶 / 取消置顶。走元信息更新，不产生 revision。 */
+  async function setPinned(id: string, pinned: boolean) {
+    const updated = await api.updateTable(id, { pinned })
+    if (table.value?.id === id) {
+      table.value = { ...table.value, ...updated }
+    }
+    // 排序由服务端按 pinned 优先，重新拉一次列表让顺序生效
+    await loadTables()
+    return updated
+  }
+
   // ---------- 当前表 ----------
 
   async function openTable(id: string) {
@@ -258,6 +269,7 @@ export const useSpecTableStore = defineStore('specTable', () => {
     removeTable,
     duplicateTable,
     renameTable,
+    setPinned,
 
     // 当前表
     table,

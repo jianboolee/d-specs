@@ -50,6 +50,8 @@ export interface TableDetail {
   /** 产品类型标签，由 AI 分析写入 */
   tags: string[]
   visibility: 'private' | 'link'
+  /** 用户级置顶：为 true 时在列表里排到最前 */
+  pinned: boolean
   current_revision: number
   created_at: string
   updated_at: string
@@ -64,6 +66,8 @@ export interface TableSummary {
   /** 产品类型标签，由 AI 分析写入 */
   tags: string[]
   visibility: 'private' | 'link'
+  /** 用户级置顶：为 true 时在列表里排到最前 */
+  pinned: boolean
   current_revision: number
   item_count: number
   created_at: string
