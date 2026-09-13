@@ -191,10 +191,19 @@ async function handleAddItem(draft: {
   }
 }
 
+/**
+ * 待删除的参数 + 确认框可见性分开存。
+ *
+ * 不能只用 removingItem 兼任「弹窗是否打开」：AlertDialogAction 自身就是
+ * DialogClose，它的关闭回调（把状态置空）会先于这里的 @click 执行，导致
+ * confirmRemoveItem 读到的目标已被清空。拆开后关闭只收起弹窗，不丢目标。
+ */
 const removingItem = ref<{ id: string; name: string } | null>(null)
+const showRemoveItem = ref(false)
 
 function handleRemoveItem(itemId: string, name: string) {
   removingItem.value = { id: itemId, name }
+  showRemoveItem.value = true
 }
 
 async function confirmRemoveItem() {
@@ -205,6 +214,7 @@ async function confirmRemoveItem() {
   } catch (err) {
     toast.error(err instanceof ApiError ? err.message : '删除失败')
   } finally {
+    showRemoveItem.value = false
     removingItem.value = null
   }
 }
@@ -411,7 +421,7 @@ async function handleUndoMessage(messageId: string) {
     </Dialog>
 
     <!-- 删除参数 -->
-    <AlertDialog :open="!!removingItem" @update:open="(v) => !v && (removingItem = null)">
+    <AlertDialog :open="showRemoveItem" @update:open="(v) => (showRemoveItem = v)">
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>删除参数</AlertDialogTitle>
@@ -420,7 +430,7 @@ async function handleUndoMessage(messageId: string) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel @click="removingItem = null">取消</AlertDialogCancel>
+          <AlertDialogCancel @click="showRemoveItem = false">取消</AlertDialogCancel>
           <AlertDialogAction variant="destructive" @click="confirmRemoveItem">删除</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
