@@ -515,12 +515,19 @@ onMounted(() => {
 
 /* ==================== 手机端：侧栏变抽屉 ==================== */
 
+/*
+ * 层级契约：应用外壳的覆盖层（汉堡/遮罩/抽屉/画布）都必须低于弹窗层
+ * （ui/dialog、alert-dialog、dropdown-menu、popover 一律 z-50）。
+ * 否则从覆盖层里打开的弹窗会被盖在下面，表现为「点了没反应」。
+ * 这里用 30–42，把 50 整个让给弹窗。
+ */
+
 /* 汉堡按钮仅手机出现（模板里已用 isMobile 控制），桌面这些规则全部不生效 */
 .hamburger {
   position: fixed;
   top: 10px;
   left: 10px;
-  z-index: 40;
+  z-index: 30;
   width: 36px;
   height: 36px;
   display: grid;
@@ -542,7 +549,7 @@ onMounted(() => {
 .sidebar-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 49;
+  z-index: 40;
   background: rgba(0, 0, 0, 0.4);
 }
 
@@ -552,7 +559,7 @@ onMounted(() => {
     top: 0;
     bottom: 0;
     left: 0;
-    z-index: 50;
+    z-index: 41;
     width: min(82vw, 300px);
     /* 抽屉收在屏幕外，打开时滑入 */
     transform: translateX(-100%);

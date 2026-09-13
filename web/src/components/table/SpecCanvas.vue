@@ -133,6 +133,10 @@ function isHighlighted(id: string) {
 </script>
 
 <template>
+  <!-- 手机端画布是右侧滑入的抽屉：左侧留出的空隙盖一层遮罩，点击即关闭，
+       避免这截空隙里的点击穿透到后面的对话上。显隐由媒体查询控制（见样式） -->
+  <div v-if="canvasOpen" class="canvas-backdrop" @click="closeCanvas" />
+
   <!-- 收起后宽度为 0，inert 让内部按钮一并退出键盘焦点顺序 -->
   <section
     class="canvas"
@@ -703,16 +707,42 @@ function isHighlighted(id: string) {
   }
 }
 
-/* ==================== 手机端：画布变全屏覆盖层 ==================== */
+/* ==================== 手机端：画布变右侧抽屉 ==================== */
+
+/* 左侧空隙的遮罩：点击关闭。用媒体查询控制显隐而不是模板里的 isMobile，
+   避免 JS 判断与 CSS 断点出现时序差异时遮罩缺失。 */
+.canvas-backdrop {
+  display: none;
+}
 
 @media (max-width: 768px) {
-  .canvas {
+  .canvas-backdrop {
+    display: block;
     position: fixed;
     inset: 0;
-    z-index: 60;
-    width: 100%;
+    z-index: 41;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .canvas {
+    /* 左侧留出的一截空隙，露出后面的对话：一眼看出这是「盖上来的一层」而不是
+       导航到了新页面，用户就不会下意识去点浏览器后退。改这个值即可调整空隙宽度。 */
+    --canvas-peek: 40px;
+
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    left: var(--canvas-peek);
+    /* 关键：必须重置基类的宽度。基类是 clamp(200px, 38%, 620px)，而手机上 38%
+       只有一百多像素，会被夹到 200px 下限 —— 画布于是又窄又不贴右缘，整层错位。
+       置为 auto 后宽度由 left/right 自动推导 = 视口宽 − 空隙宽，正好贴满右侧。 */
+    width: auto;
+    /* 必须低于弹窗层（ui/dialog 等一律 z-50）：画布里的分享、删除确认都要弹窗，
+       盖到它们上面就会出现「点了没反应」。层级契约见 AppSidebar 同段注释。 */
+    z-index: 42;
     border-left: none;
-    /* 收在屏幕右侧之外，打开时滑入 */
+    /* left 有偏移，且宽度 = 视口 − 偏移，所以 translateX(100%) 恰好把它推到屏幕外 */
     transform: translateX(100%);
     transition: transform 0.22s ease;
   }
@@ -721,7 +751,7 @@ function isHighlighted(id: string) {
     transform: translateX(0);
   }
 
-  /* 桌面按比例自适应，手机上直接铺满，内边距也收一点 */
+  /* 手机上画布铺满右侧，内边距也收一点 */
   .canvas-head {
     padding: 0 12px 0 16px;
   }
