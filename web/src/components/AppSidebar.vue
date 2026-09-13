@@ -87,6 +87,16 @@ function goAll() {
   void router.push({ name: 'tables' })
 }
 
+/**
+ * 公开发现页：全站已发布的参数表。
+ *
+ * 用新标签页打开而不是路由跳转 —— 发现页是独立公开页、不带侧栏，
+ * 跳过去就回不来，还会丢掉当前正在编辑的表。
+ */
+function openDiscover() {
+  window.open('/discover', '_blank', 'noopener')
+}
+
 /** 搜索结果被选中：打开该表并收起搜索面板 */
 function openSearchResult(table: TableSummary) {
   showSearch.value = false
@@ -127,7 +137,7 @@ onMounted(() => {
       <span v-if="!collapsed">新建参数表</span>
     </button>
 
-    <!-- 新建 / 搜索 / 我的参数表 归为一组：都是「动作」，与下面的表列表分开 -->
+    <!-- 新建 / 搜索 / 发现 / 我的参数表 归为一组：都是「动作」，与下面的表列表分开 -->
     <div class="sidebar-actions">
       <button
         type="button"
@@ -137,6 +147,16 @@ onMounted(() => {
       >
         <i class="ri-search-line" />
         <span v-if="!collapsed" class="ds-ellipsis">搜索</span>
+      </button>
+
+      <button
+        type="button"
+        class="table-item"
+        :title="collapsed ? '发现' : undefined"
+        @click="openDiscover"
+      >
+        <i class="ri-compass-3-line" />
+        <span v-if="!collapsed" class="ds-ellipsis">发现</span>
       </button>
 
       <button

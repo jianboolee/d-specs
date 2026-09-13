@@ -123,6 +123,11 @@ func (s *Service) ListPublicTables(ctx context.Context) ([]SitemapEntry, error) 
 	return s.repo.ListPublicTables(ctx)
 }
 
+// SearchPublicTables 公开列表 / 搜索，用于「发现」页。无需登录。
+func (s *Service) SearchPublicTables(ctx context.Context, keyword string, limit int) ([]PublicTableSummary, error) {
+	return s.repo.SearchPublicTables(ctx, keyword, limit)
+}
+
 func groupRows(rows []publicItemRow) []PublicGroup {
 	index := map[string]int{}
 	groups := make([]PublicGroup, 0, 4)

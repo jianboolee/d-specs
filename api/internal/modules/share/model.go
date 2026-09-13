@@ -66,3 +66,17 @@ type SitemapEntry struct {
 	Title     string    `gorm:"column:title"`
 	UpdatedAt time.Time `gorm:"column:updated_at"`
 }
+
+// PublicTableSummary 公开列表页的一行。
+//
+// 与 SitemapEntry 一样只走公开边界（share_links.enabled），字段面向访客展示，
+// 不含 user_id / visibility 等内部信息。
+type PublicTableSummary struct {
+	ID          string    `gorm:"column:id" json:"id"`
+	Title       string    `gorm:"column:title" json:"title"`
+	Description string    `gorm:"column:description" json:"description"`
+	Industry    string    `gorm:"column:industry" json:"industry"`
+	Tags        []string  `gorm:"column:tags;serializer:json" json:"tags"`
+	ItemCount   int64     `gorm:"column:item_count" json:"item_count"`
+	UpdatedAt   time.Time `gorm:"column:updated_at" json:"updated_at"`
+}

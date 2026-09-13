@@ -3,6 +3,7 @@ package share
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/jianboolee/d-specs/internal/infrastructure/idgen"
@@ -152,6 +153,32 @@ func (r *Repository) ListPublicTables(ctx context.Context) ([]SitemapEntry, erro
 		Where("t.deleted_at IS NULL").
 		Order("t.updated_at DESC").
 		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+// SearchPublicTables 公开列表 / 公开搜索，用于「发现」页。
+//
+// 访问边界与公开分享页一致：share_links.enabled 为真且表未被软删除。
+// keyword 为空时按最近更新返回前 limit 条，作为默认列表。
+func (r *Repository) SearchPublicTables(ctx context.Context, keyword string, limit int) ([]PublicTableSummary, error) {
+	q := r.db.WithContext(ctx).
+		Table("spec_tables AS t").
+		Select("t.id, t.title, t.description, t.industry, t.tags, t.updated_at, " +
+			"(SELECT COUNT(*) FROM spec_items i WHERE i.table_id = t.id) AS item_count").
+		Joins("JOIN share_links AS s ON s.table_id = t.id AND s.enabled = true").
+		Where("t.deleted_at IS NULL")
+
+	// 只匹配访客看得见的元信息；参数项内容与标签暂不纳入，保持「简单搜索」
+	if kw := strings.TrimSpace(keyword); kw != "" {
+		like := "%" + kw + "%"
+		q = q.Where("(t.title ILIKE ? OR t.description ILIKE ? OR t.industry ILIKE ?)", like, like, like)
+	}
+
+	var rows []PublicTableSummary
+	err := q.Order("t.updated_at DESC").Limit(limit).Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}

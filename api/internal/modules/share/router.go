@@ -30,6 +30,8 @@ func Register(engine *gin.Engine, rg *gin.RouterGroup, d *deps.Deps, specSvc *sp
 	// 公开只读：访问边界由 share_links.enabled 承担。
 	// key 兼容表 id（规范）与历史 token。
 	rg.GET("/public/specs/:id", h.PublicSpec)
+	// 公开列表 / 搜索：与公开分享同一访问边界，供「发现」页使用
+	rg.GET("/public/specs", h.PublicTableList)
 
 	// 分享页 HTML：搜索引擎抓取与链接预览的实际入口
 	engine.GET("/s/:id", h.PublicPage)

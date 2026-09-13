@@ -40,6 +40,7 @@ func TestRegisterRoutesDoNotPanic(t *testing.T) {
 		"GET /s/:id",
 		"GET /sitemap.xml",
 		"GET /robots.txt",
+		"GET /api/v1/public/specs",
 		"GET /api/v1/public/specs/:id",
 	} {
 		if !routes[want] {

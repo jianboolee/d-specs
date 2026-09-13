@@ -76,6 +76,21 @@ func (h *Handler) PublicSpec(c *gin.Context) {
 	response.OK(c, res)
 }
 
+// PublicTableList 公开参数表列表 / 搜索，无需登录。
+//
+// 只返回分享开启中的表；边界与 PublicSpec 完全一致，不因为多一个列表接口就放宽。
+func (h *Handler) PublicTableList(c *gin.Context) {
+	// 简单搜索不做分页，给个上限防止一次拉全表
+	const maxResults = 200
+
+	entries, err := h.svc.SearchPublicTables(c.Request.Context(), c.Query("keyword"), maxResults)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, 500, "服务器内部错误")
+		return
+	}
+	response.OK(c, gin.H{"items": entries})
+}
+
 // PublicPage 分享页的 HTML 渲染。
 //
 // 这是全部公开页面里唯一返给搜索引擎的入口：爬虫（尤其是不执行 JS 的百度）

@@ -256,6 +256,17 @@ export interface ShareStatus {
   view_count: number
 }
 
+/** 公开列表页（发现页）条目：只含访客可见的元信息 */
+export interface PublicTableSummary {
+  id: string
+  title: string
+  description: string
+  industry: string
+  tags: string[]
+  item_count: number
+  updated_at: string
+}
+
 export interface PublicSpec {
   title: string
   description: string

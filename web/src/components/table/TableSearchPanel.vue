@@ -4,6 +4,11 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/api/http'
 import * as api from '@/api/tables'
 import type { TableSummary } from '@/types/api'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 /**
  * 参数表搜索面板。
@@ -115,6 +120,11 @@ function choose(index: number) {
   if (table) emit('select', table)
 }
 
+/** 新标签页打开公开发现页：本面板搜的是自己的表，发现页搜的是全站已发布的表 */
+function openDiscover() {
+  window.open('/discover', '_blank', 'noopener')
+}
+
 onMounted(() => {
   void runSearch()
   if (props.autofocus) {
@@ -140,6 +150,21 @@ defineExpose({ focus: () => inputRef.value?.focus() })
         @keydown="onKeydown"
       />
       <i v-if="loading" class="ri-loader-4-line spin" />
+
+      <!-- 快捷入口：在新标签页浏览全站已发布的参数表 -->
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            class="discover-btn"
+            aria-label="在新标签页浏览公开参数表"
+            @click="openDiscover"
+          >
+            <i class="ri-external-link-line" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">在新标签页浏览公开参数表</TooltipContent>
+      </Tooltip>
     </div>
 
     <div ref="listRef" class="search-results ds-scroll-y">
@@ -214,6 +239,26 @@ defineExpose({ focus: () => inputRef.value?.focus() })
 
 .search-input::placeholder {
   color: var(--ds-text-tertiary);
+}
+
+/* 右侧快捷入口：与侧栏 head-btn / 画布 ghost-btn 同尺寸同手感 */
+.discover-btn {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ds-text-tertiary);
+  font-size: 17px;
+  cursor: pointer;
+}
+
+.discover-btn:hover {
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
 }
 
 .search-results {
