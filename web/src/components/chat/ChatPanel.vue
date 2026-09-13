@@ -805,4 +805,11 @@ function kindLabel(kind: ChatChange['kind']) {
   font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
 }
+
+/* 手机端没有物理键盘，Enter/Shift+Enter 的提示没有意义，还把输入区往上顶 */
+@media (max-width: 768px) {
+  .composer-hint {
+    display: none;
+  }
+}
 </style>
