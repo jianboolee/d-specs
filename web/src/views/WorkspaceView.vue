@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
@@ -12,10 +12,19 @@ import { useChatStore } from '@/stores/chat'
 import { useSpecTableStore } from '@/stores/specTable'
 import { formatRelativeTime } from '@/utils/time'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -49,26 +58,67 @@ const revision = computed(() => spec.table?.current_revision ?? 0)
 const showShare = ref(false)
 const showSessions = ref(false)
 
-// ---------- 标题编辑（放在 chat-head 里） ----------
+// ---------- 表级操作（标题右侧的「操作」菜单） ----------
 
-const titleDraft = ref('')
-const editingTitle = ref(false)
-const titleInputRef = ref<HTMLInputElement | null>(null)
+/**
+ * 重命名与复制共用一个「输入新名字」的弹窗：两者都只是换一个标题，
+ * 区别只在复制会以新名字另建一份副本。
+ */
+type NameAction = 'rename' | 'duplicate'
 
-async function startRename() {
-  titleDraft.value = title.value
-  editingTitle.value = true
-  // span 被 v-if 换成 input 后焦点会丢失，等渲染完再手动聚焦
-  await nextTick()
-  titleInputRef.value?.focus()
-  titleInputRef.value?.select()
+const nameAction = ref<NameAction | null>(null)
+const nameValue = ref('')
+const nameSubmitting = ref(false)
+
+const nameDialogTitle = computed(() =>
+  nameAction.value === 'duplicate' ? '复制参数表' : '重命名参数表',
+)
+
+function openRename() {
+  nameAction.value = 'rename'
+  nameValue.value = title.value
 }
 
-function commitRename() {
-  editingTitle.value = false
-  const next = titleDraft.value.trim()
-  if (!next || next === title.value) return
-  void handleRename(next)
+function openDuplicate() {
+  nameAction.value = 'duplicate'
+  // 默认带上「副本」，用户多半会把它改成目标产品的名字
+  nameValue.value = `${title.value} 副本`
+}
+
+function closeNameDialog() {
+  if (nameSubmitting.value) return
+  nameAction.value = null
+}
+
+async function submitName() {
+  const table = spec.table
+  const action = nameAction.value
+  const next = nameValue.value.trim()
+  if (!table || !action || !next || nameSubmitting.value) return
+
+  nameSubmitting.value = true
+  try {
+    if (action === 'duplicate') {
+      const res = await spec.duplicateTable(table.id, next)
+      toast.success(`已复制为「${res.table.title}」`)
+      nameAction.value = null
+      // 复制通常是为了改几个值做个变体，直接切到副本更顺手
+      void router.push({ name: 'workspace', params: { id: res.table.id } })
+      return
+    }
+
+    // 名字没变就不用发请求
+    if (next !== table.title) {
+      await spec.renameTable(table.id, next)
+      toast.success('已重命名')
+    }
+    nameAction.value = null
+  } catch (err) {
+    const fallback = action === 'duplicate' ? '复制失败' : '重命名失败'
+    toast.error(err instanceof ApiError ? err.message : fallback)
+  } finally {
+    nameSubmitting.value = false
+  }
 }
 
 const chatPlaceholder = computed(
@@ -161,10 +211,6 @@ async function confirmRemoveItem() {
 
 const removingTable = ref(false)
 
-function handleRemoveTable() {
-  if (spec.table) removingTable.value = true
-}
-
 async function confirmRemoveTable() {
   const table = spec.table
   if (!table) return
@@ -176,15 +222,6 @@ async function confirmRemoveTable() {
     toast.error(err instanceof ApiError ? err.message : '删除失败')
   } finally {
     removingTable.value = false
-  }
-}
-
-async function handleRename(next: string) {
-  if (!spec.table) return
-  try {
-    await spec.renameTable(spec.table.id, next)
-  } catch (err) {
-    toast.error(err instanceof ApiError ? err.message : '重命名失败')
   }
 }
 
@@ -235,22 +272,39 @@ async function handleUndoMessage(messageId: string) {
         <div class="chat-col">
           <header class="chat-head">
             <div class="head-text">
-              <input
-                v-if="editingTitle"
-                ref="titleInputRef"
-                v-model="titleDraft"
-                class="title-input"
-                @blur="commitRename"
-                @keydown.enter.prevent="commitRename"
-                @keydown.esc="editingTitle = false"
-              />
-              <span v-else class="head-title ds-ellipsis" :class="{ clickable: !!title }" @click="startRename">
-                {{ title }}
-              </span>
+              <span class="head-title ds-ellipsis" :title="title">{{ title }}</span>
               <span v-if="description" class="head-sub ds-ellipsis">{{ description }}</span>
             </div>
 
             <div class="head-actions">
+              <!-- 表级操作统一收在这里，后续新增的表操作也放这个菜单 -->
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <button type="button" class="head-btn" aria-label="操作" title="操作">
+                    <i class="ri-more-line" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" class="min-w-[150px]">
+                  <DropdownMenuItem @select="openDuplicate">
+                    <i class="ri-file-copy-line" />
+                    复制
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @select="openRename">
+                    <i class="ri-edit-line" />
+                    重命名
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @select="showShare = true">
+                    <i class="ri-share-forward-line" />
+                    分享
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" @select="removingTable = true">
+                    <i class="ri-delete-bin-line" />
+                    删除
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               <Tooltip>
                 <TooltipTrigger as-child>
                   <button type="button" class="head-btn" @click="showSessions = true">
@@ -296,8 +350,6 @@ async function handleUndoMessage(messageId: string) {
           @update-item="handleUpdateItem"
           @add-item="handleAddItem"
           @remove-item="handleRemoveItem"
-          @share="showShare = true"
-          @remove="handleRemoveTable"
           @undo="handleUndo"
           @redo="handleRedo"
         />
@@ -368,6 +420,32 @@ async function handleUndoMessage(messageId: string) {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <!-- 重命名 / 复制（共用一个输入新名字的弹窗） -->
+    <Dialog :open="!!nameAction" @update:open="(v) => !v && closeNameDialog()">
+      <DialogContent class="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>{{ nameDialogTitle }}</DialogTitle>
+          <DialogDescription v-if="nameAction === 'duplicate'">
+            将以新名字创建一份副本，包含当前全部参数。
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          v-model="nameValue"
+          maxlength="120"
+          placeholder="参数表名称"
+          autofocus
+          @keydown.enter.prevent="submitName"
+        />
+        <DialogFooter>
+          <Button variant="outline" :disabled="nameSubmitting" @click="closeNameDialog">取消</Button>
+          <Button :disabled="!nameValue.trim() || nameSubmitting" @click="submitName">
+            <i v-if="nameSubmitting" class="ri-loader-4-line animate-spin" />
+            {{ nameAction === 'duplicate' ? '创建副本' : '保存' }}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <!-- 删除参数表 -->
     <AlertDialog :open="removingTable" @update:open="(v) => !v && (removingTable = false)">
@@ -454,36 +532,6 @@ async function handleUndoMessage(messageId: string) {
   font-weight: 600;
   color: var(--ds-text);
   line-height: 1.3;
-}
-
-/*
- * 与 .title-input 共用同一套盒模型（同内边距、同边框宽度、同行高），
- * 编辑态切换时不会有位移或高度跳变；这里用透明边框先把 1px 占住。
- * margin-left = 左内边距 + 边框宽，使静止态文字与 head-text 左缘对齐。
- */
-.head-title.clickable {
-  cursor: text;
-  border: 1px solid transparent;
-  padding: 4px 10px;
-  margin-left: -11px;
-}
-
-.head-title.clickable:hover {
-  background: var(--ds-surface-muted);
-}
-
-.title-input {
-  width: 100%;
-  font-size: var(--ds-font-md);
-  font-weight: 600;
-  line-height: 1.3;
-  color: var(--ds-text);
-  border: 1px solid var(--ds-border-strong);
-  padding: 4px 10px;
-  margin-left: -11px;
-  outline: none;
-  background: var(--ds-surface);
-  font-family: inherit;
 }
 
 .head-sub {

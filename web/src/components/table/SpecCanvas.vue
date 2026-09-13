@@ -34,8 +34,6 @@ const emit = defineEmits<{
     draft: { name: string; value: string; group_name: string; value_type: 'text' | 'number' },
   ]
   'remove-item': [itemId: string, name: string]
-  share: []
-  remove: []
   undo: []
   redo: []
 }>()
@@ -162,34 +160,6 @@ function isHighlighted(id: string) {
             </span>
           </TooltipTrigger>
           <TooltipContent side="bottom">重做</TooltipContent>
-        </Tooltip>
-
-        <Tooltip v-if="!readonly">
-          <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="ghost-btn icon-only"
-              aria-label="分享"
-              @click="emit('share')"
-            >
-              <i class="ri-share-line" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">分享</TooltipContent>
-        </Tooltip>
-
-        <Tooltip v-if="!readonly">
-          <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="ghost-btn danger icon-only"
-              aria-label="删除这张参数表"
-              @click="emit('remove')"
-            >
-              <i class="ri-delete-bin-line" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">删除这张参数表</TooltipContent>
         </Tooltip>
       </div>
     </header>
@@ -386,12 +356,6 @@ function isHighlighted(id: string) {
 
 .tip-wrap:has(> .ghost-btn:disabled) {
   cursor: not-allowed;
-}
-
-/* 危险操作：平时中性，悬停才显红，避免误点 */
-.ghost-btn.danger:hover:not(:disabled) {
-  background: rgba(214, 69, 69, 0.1);
-  color: #d64545;
 }
 
 .canvas-body {
