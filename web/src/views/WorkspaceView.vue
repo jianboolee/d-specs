@@ -8,9 +8,11 @@ import ChatPanel from '@/components/chat/ChatPanel.vue'
 import ShareDialog from '@/components/table/ShareDialog.vue'
 import SpecCanvas from '@/components/table/SpecCanvas.vue'
 import { ApiError } from '@/api/http'
+import * as shareApi from '@/api/share'
 import { useChatStore } from '@/stores/chat'
 import { useSpecTableStore } from '@/stores/specTable'
 import { formatRelativeTime } from '@/utils/time'
+import type { ShareStatus } from '@/types/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -57,6 +59,55 @@ const revision = computed(() => spec.table?.current_revision ?? 0)
 
 const showShare = ref(false)
 const showSessions = ref(false)
+
+// ---------- 分享 ----------
+
+const shareStatus = ref<ShareStatus | null>(null)
+const shareBusy = ref(false)
+
+const shareEnabled = computed(() => shareStatus.value?.enabled === true)
+const shareUrl = computed(() => shareStatus.value?.url ?? '')
+
+/** 拉一次分享状态：标题旁的公开标识、菜单里的开启/关闭与预览都依赖它 */
+async function loadShareStatus() {
+  if (!tableId.value) return
+  try {
+    shareStatus.value = await shareApi.getShareStatus(tableId.value)
+  } catch {
+    // 读不到就当作未分享，不影响主流程
+    shareStatus.value = null
+  }
+}
+
+/** 菜单里的一键开启/关闭，省去打开分享弹窗 */
+async function toggleShare() {
+  if (!spec.table || shareBusy.value) return
+  shareBusy.value = true
+  try {
+    shareStatus.value = shareEnabled.value
+      ? await shareApi.disableShare(spec.table.id)
+      : await shareApi.enableShare(spec.table.id)
+    toast.success(shareEnabled.value ? '已开启分享' : '已关闭分享，原链接立即失效')
+    // 侧栏的公开标识读列表里的 visibility，刷新一次让它同步
+    void spec.loadTables()
+  } catch (err) {
+    toast.error(err instanceof ApiError ? err.message : '操作失败')
+  } finally {
+    shareBusy.value = false
+  }
+}
+
+/** 预览公开页；未开启分享时不可点，因此 url 必然存在 */
+function previewShare() {
+  if (!shareUrl.value) return
+  window.open(shareUrl.value, '_blank', 'noopener')
+}
+
+/** 分享弹窗里改了状态：重新拉取并同步侧栏 */
+async function onShareChanged() {
+  await loadShareStatus()
+  void spec.loadTables()
+}
 
 // ---------- 表级操作（标题右侧的「操作」菜单） ----------
 
@@ -145,6 +196,8 @@ async function load() {
   }
   // 表打开之后再恢复历史对话，避免两处 loading 互相干扰
   await chat.initForTable(tableId.value)
+  // 分享状态独立于表内容，单独拉一次（失败不挡路）
+  void loadShareStatus()
 }
 
 onMounted(load)
@@ -288,25 +341,44 @@ async function handleUndoMessage(messageId: string) {
         <div class="chat-col">
           <header class="chat-head">
             <div class="head-text">
+              <!-- 已开启分享：圆点放在标题左侧，悬停说明含义 -->
+              <Tooltip v-if="shareEnabled">
+                <TooltipTrigger as-child>
+                  <span class="head-share-dot" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom">已开启分享</TooltipContent>
+              </Tooltip>
               <span class="head-title ds-ellipsis" :title="title">{{ title }}</span>
-            </div>
 
-            <div class="head-actions">
-              <!-- 表级操作统一收在这里，后续新增的表操作也放这个菜单 -->
+              <!-- 表级操作紧挨标题：它改的是这张表，和右侧的会话操作分开放 -->
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                  <button type="button" class="head-btn" aria-label="操作" title="操作">
+                  <button type="button" class="head-btn" aria-label="参数表操作" title="参数表操作">
                     <i class="ri-more-line" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" class="min-w-[150px]">
+                <DropdownMenuContent align="start" class="min-w-[150px]">
                   <DropdownMenuItem @select="openDuplicate">
                     <i class="ri-file-copy-line" />
-                    复制
+                    创建副本
                   </DropdownMenuItem>
                   <DropdownMenuItem @select="openRename">
                     <i class="ri-edit-line" />
                     重命名
+                  </DropdownMenuItem>
+                  <DropdownMenuItem @select="showShare = true">
+                    <i class="ri-share-forward-line" />
+                    分享
+                  </DropdownMenuItem>
+                  <!-- 快速开关，不必进分享弹窗 -->
+                  <DropdownMenuItem :disabled="shareBusy" @select="toggleShare">
+                    <i :class="shareEnabled ? 'ri-link-unlink-m' : 'ri-link'" />
+                    {{ shareEnabled ? '关闭分享' : '开启分享' }}
+                  </DropdownMenuItem>
+                  <!-- 未开启分享时没有公开地址，预览置灰 -->
+                  <DropdownMenuItem :disabled="!shareEnabled" @select="previewShare">
+                    <i class="ri-external-link-line" />
+                    预览
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem variant="destructive" @select="removingTable = true">
@@ -315,7 +387,9 @@ async function handleUndoMessage(messageId: string) {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
 
+            <div class="head-actions">
               <Tooltip>
                 <TooltipTrigger as-child>
                   <button type="button" class="head-btn" @click="showSessions = true">
@@ -381,6 +455,7 @@ async function handleUndoMessage(messageId: string) {
       v-model:show="showShare"
       :table-id="spec.table.id"
       :table-title="spec.table.title"
+      @changed="onShareChanged"
     />
 
     <!-- 历史对话 -->
@@ -536,14 +611,24 @@ async function handleUndoMessage(messageId: string) {
 }
 
 .head-text {
-  flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   line-height: 1.3;
 }
 
+/* 已开启分享：与侧栏同款浅蓝圆点，放在标题左侧 */
+.head-share-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ds-share-dot);
+}
+
 .head-title {
+  min-width: 0;
   font-size: var(--ds-font-md);
   font-weight: 600;
   color: var(--ds-text);
@@ -551,6 +636,8 @@ async function handleUndoMessage(messageId: string) {
 }
 
 .head-actions {
+  /* 会话操作固定在最右，表级操作紧挨标题 */
+  margin-left: auto;
   flex: none;
   display: flex;
   align-items: center;
@@ -559,6 +646,7 @@ async function handleUndoMessage(messageId: string) {
 
 .head-btn {
   position: relative;
+  flex: none;
   width: 34px;
   height: 34px;
   display: grid;

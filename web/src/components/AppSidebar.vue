@@ -40,6 +40,9 @@ const filtered = computed(() => {
 
 const activeId = computed(() => (route.name === 'workspace' ? String(route.params.id ?? '') : ''))
 
+// 停在列表页时，「我的参数表」像被选中的列表条目一样高亮
+const isAllActive = computed(() => route.name === 'tables')
+
 const displayName = computed(() => auth.user?.name || auth.user?.email || '未登录')
 const avatarText = computed(() => displayName.value.slice(0, 1).toUpperCase())
 
@@ -116,37 +119,44 @@ onMounted(() => {
     </div>
 
     <div class="table-list ds-scroll-y">
-      <!-- 列表分组标题：「我的参数表」，点击进入列表页 -->
+      <!-- 「我的参数表」：进入列表页的入口，样式与下面的表条目保持一致。
+           它保留图标作为标识（收起时图标也是唯一的可点击标识）。 -->
       <button
-        v-if="!collapsed"
         type="button"
-        class="list-title"
+        class="table-item list-all"
+        :class="{ active: isAllActive }"
+        :title="collapsed ? '我的参数表' : undefined"
         @click="goAll"
       >
-        我的参数表
+        <i class="ri-file-list-3-line" />
+        <span v-if="!collapsed" class="ds-ellipsis">我的参数表</span>
+        <span v-if="!collapsed && spec.tables.length > 0" class="item-count">
+          {{ spec.tables.length }}
+        </span>
       </button>
 
-      <template v-if="filtered.length > 0">
+      <!-- 收起时只保留上面的「我的参数表」，不铺开具体表 -->
+      <template v-if="!collapsed">
         <button
           v-for="table in filtered"
           :key="table.id"
           type="button"
           class="table-item"
           :class="{ active: table.id === activeId }"
-          :title="collapsed ? table.title : undefined"
           @click="openTable(table.id)"
         >
-          <i class="ri-file-list-line" />
-          <span v-if="!collapsed" class="ds-ellipsis">{{ table.title }}</span>
-          <span v-if="!collapsed" class="item-count">{{ table.item_count }}</span>
+          <!-- 已公开分享：圆点放在左侧图标列，弱提示且不挤占标题 -->
+          <span v-if="table.visibility === 'link'" class="dot-public" title="已公开分享" />
+          <span class="ds-ellipsis">{{ table.title }}</span>
+          <span class="item-count">{{ table.item_count }}</span>
         </button>
-      </template>
 
-      <div v-else class="list-empty">
-        <template v-if="keyword">没有匹配的参数表</template>
-        <template v-else-if="spec.listLoading">加载中…</template>
-        <template v-else>还没有参数表<br />点上方按钮创建第一张</template>
-      </div>
+        <div v-if="filtered.length === 0" class="list-empty">
+          <template v-if="keyword">没有匹配的参数表</template>
+          <template v-else-if="spec.listLoading">加载中…</template>
+          <template v-else>还没有参数表<br />点上方按钮创建第一张</template>
+        </div>
+      </template>
     </div>
 
     <div class="sidebar-foot">
@@ -318,23 +328,17 @@ onMounted(() => {
   padding: 12px 8px;
 }
 
-/* 列表分组标题：静态文字，仅 hover 提示可点击 */
-.list-title {
-  display: block;
-  width: 100%;
-  padding: 2px 10px 8px;
-  border: none;
-  background: transparent;
-  color: var(--ds-text-tertiary);
-  font-size: var(--ds-font-xs);
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  transition: color 0.12s ease;
+/* 「我的参数表」是分组入口（带图标），下面的表条目是它的子项。
+   子项缩进到与入口文字左对齐，形成层级；不用加粗，选中态也只靠底色区分。 */
+.list-all {
+  margin-bottom: 6px;
 }
 
-.list-title:hover {
-  color: var(--ds-text);
+/* 左边距 = 入口的 padding-left(10) + 图标(18) + gap(10)，让子项文字与入口文字对齐。
+   同时作为圆点的定位容器。 */
+.table-item:not(.list-all) {
+  position: relative;
+  padding-left: 38px;
 }
 
 .table-item {
@@ -384,6 +388,18 @@ onMounted(() => {
   font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
   font-variant-numeric: tabular-nums;
+}
+
+/* 已公开分享：圆点绝对定位在左侧图标列，不占位、不影响标题对齐 */
+.dot-public {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ds-share-dot);
 }
 
 .list-empty {

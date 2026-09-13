@@ -23,6 +23,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:show': [value: boolean]
+  /** 开启/关闭成功后通知外部刷新（侧栏与标题旁的公开标识依赖它） */
+  changed: []
 }>()
 
 const loading = ref(false)
@@ -62,6 +64,8 @@ async function toggle() {
       ? await shareApi.disableShare(props.tableId)
       : await shareApi.enableShare(props.tableId)
     toast.success(enabled.value ? '已开启分享' : '已关闭分享，原链接立即失效')
+    // 让外部（侧栏列表、标题旁的公开标识）同步最新状态
+    emit('changed')
   } catch (err) {
     toast.error(describe(err))
   } finally {
