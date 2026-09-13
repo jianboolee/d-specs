@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import * as chatApi from '@/api/chat'
@@ -68,11 +68,15 @@ export const useChatStore = defineStore('chat', () => {
     return `${prefix}-${Date.now()}-${seq}`
   }
 
-  /** 把一段文字追加到消息上；分段之间补一个空行，避免与已有内容粘在一起 */
+  /**
+   * 接收一段流式正文增量。
+   *
+   * 服务端按 token 推送 delta，直接拼在末尾即可；不做 trim，
+   * 否则会吃掉正文里的空格与换行，破坏 Markdown 排版。
+   */
   function appendText(msg: UiMessage, chunk: string) {
-    const text = chunk.trim()
-    if (!text) return
-    msg.text = msg.text ? `${msg.text}\n\n${text}` : text
+    if (!chunk) return
+    msg.text += chunk
   }
 
   // ---------- 会话历史 ----------
@@ -149,12 +153,20 @@ export const useChatStore = defineStore('chat', () => {
 
     messages.value.push({ id: nextId('u'), role: 'user', text: content })
 
-    const assistant: UiMessage = {
+    /*
+     * 必须用 reactive() 包一层再 push。
+     *
+     * 直接把普通对象 push 进响应式数组时，数组里存的是原始对象；之后对这条
+     * 原始引用（assistant.text += ...）的修改绕过了 Proxy，不会触发重新渲染。
+     * 流式正文因此会一直积攒到别的响应式变化（如 sending 置回 false）才一次性
+     * 显示出来 —— 那样就白流了。
+     */
+    const assistant = reactive<UiMessage>({
       id: nextId('a'),
       role: 'assistant',
       text: '',
       streaming: true,
-    }
+    })
     messages.value.push(assistant)
 
     sending.value = true
@@ -219,8 +231,11 @@ export const useChatStore = defineStore('chat', () => {
 
       case 'done':
         assistant.toolLabel = undefined
-        if (event.reply) appendText(assistant, event.reply)
-        if (!assistant.text) assistant.text = '（模型没有返回文字说明）'
+        // 正文已经由 text 增量拼好，这里只用 reply 兜底：
+        // 例如服务端判定截断后直接给了兜底文案、或正文为空时的占位说明。
+        if (!assistant.text.trim()) {
+          assistant.text = event.reply?.trim() || '（模型没有返回文字说明）'
+        }
         break
 
       case 'error':

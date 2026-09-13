@@ -133,11 +133,18 @@ func (a *Agent) Run(
 	for round := 0; round < a.cfg.MaxToolRounds; round++ {
 		res.Rounds = round + 1
 
-		resp, err := a.llm.Chat(ctx, provider.ChatRequest{
+		// 流式接收：正文增量即时透出，用户能边生成边看到字，
+		// 而不是等整轮结束才一次性显示。思考增量不外发。
+		resp, err := a.llm.ChatStream(ctx, provider.ChatRequest{
 			Messages:    messages,
 			Tools:       toolDefs,
 			Temperature: a.cfg.Temperature,
 			MaxTokens:   a.cfg.MaxTokens,
+		}, func(delta provider.StreamDelta) {
+			if delta.Content == "" {
+				return
+			}
+			emitEvent(emit, Event{Type: EventText, Text: delta.Content})
 		})
 		if err != nil {
 			return nil, err
@@ -151,7 +158,7 @@ func (a *Agent) Run(
 			// 推理模型的思考与正文共享 max_tokens 预算：思考太长时正文会为空。
 			// 先追问一次，要求直接给结论、收着点思考；仍然为空才给出面向用户的提示。
 			if res.Reply == "" && resp.FinishReason == "length" {
-				reply, retryUsage := a.retryDirectAnswer(ctx, messages)
+				reply, retryUsage := a.retryDirectAnswer(ctx, messages, emit)
 				res.Usage = res.Usage.Add(retryUsage)
 				if reply != "" {
 					res.Reply = reply
@@ -161,11 +168,6 @@ func (a *Agent) Run(
 				}
 			}
 			return res, nil
-		}
-
-		// 模型在调用工具前可能先说了半句话，一并透出
-		if text := strings.TrimSpace(resp.Message.Content); text != "" {
-			emitEvent(emit, Event{Type: EventText, Text: text})
 		}
 
 		messages = append(messages, provider.Message{
@@ -320,9 +322,10 @@ const brevityInstruction = "请直接用中文给出最终回答，不要展开�
 // retryDirectAnswer 在正文被思考挤空后追问一次，只求一段结论性正文。
 //
 // 不再带工具定义：进入这个分支时工具调用已经结束，模型只需要把结论写出来。
+// 追问同样走流式，让用户能立刻看到补上的正文。
 // 追问失败（网络错误等）时不向上抛错 —— 此时真正的问题是「没拿到正文」，
 // 交给调用方按截断处理，比因为一次补救请求失败而丢掉整轮结果更好。
-func (a *Agent) retryDirectAnswer(ctx context.Context, messages []provider.Message) (string, provider.Usage) {
+func (a *Agent) retryDirectAnswer(ctx context.Context, messages []provider.Message, emit EmitFunc) (string, provider.Usage) {
 	// 复制一份再追加，避免污染外层正在累积的消息序列
 	retryMessages := make([]provider.Message, 0, len(messages)+1)
 	retryMessages = append(retryMessages, messages...)
@@ -331,10 +334,15 @@ func (a *Agent) retryDirectAnswer(ctx context.Context, messages []provider.Messa
 		Content: brevityInstruction,
 	})
 
-	resp, err := a.llm.Chat(ctx, provider.ChatRequest{
+	resp, err := a.llm.ChatStream(ctx, provider.ChatRequest{
 		Messages:    retryMessages,
 		Temperature: a.cfg.Temperature,
 		MaxTokens:   a.cfg.MaxTokens,
+	}, func(delta provider.StreamDelta) {
+		if delta.Content == "" {
+			return
+		}
+		emitEvent(emit, Event{Type: EventText, Text: delta.Content})
 	})
 	if err != nil {
 		return "", provider.Usage{}

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/jianboolee/d-specs/internal/ai/ops"
@@ -30,6 +31,27 @@ func (f *fakeProvider) Chat(_ context.Context, req provider.ChatRequest) (*provi
 		idx = len(f.responses) - 1
 	}
 	return f.responses[idx], nil
+}
+
+// ChatStream 按块把 Content 逐段回调，模拟真实的 token 级流式。
+// split 为 0 时按整段一次性回调。
+func (f *fakeProvider) ChatStream(_ context.Context, req provider.ChatRequest, onDelta func(provider.StreamDelta)) (*provider.ChatResponse, error) {
+	resp, err := f.Chat(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+	if onDelta != nil && resp.Message.Content != "" {
+		const chunk = 4
+		runes := []rune(resp.Message.Content)
+		for i := 0; i < len(runes); i += chunk {
+			end := i + chunk
+			if end > len(runes) {
+				end = len(runes)
+			}
+			onDelta(provider.StreamDelta{Content: string(runes[i:end])})
+		}
+	}
+	return resp, nil
 }
 
 // 思考吃光预算时，正文为空且 finish_reason=length；此时应追问一次拿回正文。
@@ -126,4 +148,32 @@ func TestRunNoRetryWhenContentPresent(t *testing.T) {
 
 func emptySnapshot() ops.Snapshot {
 	return ops.Snapshot{Title: "测试表", Items: []ops.Item{}}
+}
+
+// 正文应以多个 text 增量陆续透出，而不是只在最后一次性给全文。
+func TestRunEmitsTextDeltas(t *testing.T) {
+	fp := &fakeProvider{responses: []*provider.ChatResponse{
+		{
+			Message:      provider.Message{Role: provider.RoleAssistant, Content: "已经改好了，续航提升到 800km。"},
+			FinishReason: "stop",
+		},
+	}}
+
+	var deltas []string
+	ag := New(fp, Config{MaxToolRounds: 3, MaxTokens: 8192})
+	res, err := ag.Run(context.Background(), nil, emptySnapshot(), func(ev Event) {
+		if ev.Type == EventText {
+			deltas = append(deltas, ev.Text)
+		}
+	})
+	if err != nil {
+		t.Fatalf("Run 返回错误: %v", err)
+	}
+
+	if len(deltas) < 2 {
+		t.Fatalf("期望多个正文增量，实际 %d 段: %v", len(deltas), deltas)
+	}
+	if joined := strings.Join(deltas, ""); joined != res.Reply {
+		t.Fatalf("增量拼接应等于完整正文\n增量拼接: %q\n完整正文: %q", joined, res.Reply)
+	}
 }

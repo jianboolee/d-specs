@@ -124,6 +124,7 @@ func (s *Service) Stream(ctx context.Context, userID, tableID string, req SendRe
 		switch ev.Type {
 		case agent.EventText:
 			event.Type = EventText
+			// 流式下 text 是增量（delta），原样透传由前端增量拼接
 			event.Text = ev.Text
 		case agent.EventToolCall:
 			event.Type = EventToolCall

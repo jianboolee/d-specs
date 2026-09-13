@@ -127,10 +127,24 @@ func (r *ChatResponse) ToolCalls() []ToolCall {
 	return r.Message.ToolCalls
 }
 
+// StreamDelta 流式响应中的一段增量。
+//
+// Content 是正文增量，直接按顺序拼接即为完整正文；Reasoning 是思考增量，
+// 不展示给用户，仅用于观测。两者是增量而不是累计值。
+type StreamDelta struct {
+	Content   string
+	Reasoning string
+}
+
 type Provider interface {
 	Name() string
 	Model() string
 	Chat(ctx context.Context, req ChatRequest) (*ChatResponse, error)
+	// ChatStream 以流式方式执行，每收到一段正文/思考增量就回调一次 onDelta，
+	// 最终返回与 Chat 同构的完整响应（含累计正文、工具调用与用量）。
+	//
+	// onDelta 可以为 nil。回调在调用方 goroutine 内同步执行，不应阻塞过久。
+	ChatStream(ctx context.Context, req ChatRequest, onDelta func(StreamDelta)) (*ChatResponse, error)
 	// ListModels 拉取账号可用模型列表，用于部署前确认模型 id 是否正确
 	ListModels(ctx context.Context) ([]string, error)
 }
