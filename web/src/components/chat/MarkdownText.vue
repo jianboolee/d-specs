@@ -24,6 +24,19 @@ marked.use({
       const titleAttr = title ? ` title="${title}"` : ''
       return `<a href="${href}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`
     },
+    // 表格套一层滚动容器：宽表在窄消息列里横向滚动，而不是把气泡撑破
+    table(token) {
+      let head = ''
+      for (const cell of token.header) head += this.tablecell(cell)
+      let body = ''
+      for (const row of token.rows) {
+        let cells = ''
+        for (const cell of row) cells += this.tablecell(cell)
+        body += this.tablerow({ text: cells })
+      }
+      if (body) body = `<tbody>${body}</tbody>`
+      return `<div class="md-table-wrap"><table><thead>${this.tablerow({ text: head })}</thead>${body}</table></div>`
+    },
   },
 })
 
@@ -156,27 +169,68 @@ const html = computed(() => {
   border-top: 1px solid var(--ds-border);
 }
 
-/* 宽表格自己横向滚动，不撑破消息列 */
-.md :deep(table) {
-  display: block;
-  width: max-content;
-  max-width: 100%;
-  margin: 0 0 12px;
-  border-collapse: collapse;
+/*
+ * 表格：外层容器负责圆角与横向滚动，内部表格铺满可用宽度。
+ * overflow 交给容器，单元格只画内框，避免表格自己的边框与容器边框重影。
+ */
+.md :deep(.md-table-wrap) {
+  margin: 0 0 14px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.md :deep(.md-table-wrap)::-webkit-scrollbar {
+  height: 6px;
+}
+
+.md :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 0.94em;
+  line-height: 1.6;
 }
 
 .md :deep(th),
 .md :deep(td) {
-  padding: 6px 10px;
-  border: 1px solid var(--ds-border);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ds-border);
+  border-right: 1px solid var(--ds-border);
+  vertical-align: top;
+  /* markdown 的 :---: 对齐会落成 align 属性，这里的 left 会被下面的属性选择器覆盖回去 */
   text-align: left;
+}
+
+/* 最后一列去掉右边框、最后一行去掉下边框，交给容器兜底，避免与容器边框重影 */
+.md :deep(th:last-child),
+.md :deep(td:last-child) {
+  border-right: none;
+}
+
+.md :deep(tr:last-child > th),
+.md :deep(tr:last-child > td) {
+  border-bottom: none;
 }
 
 .md :deep(th) {
   background: var(--ds-surface-muted);
   font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 隔行浅色，长表格更好数行；用 text 令牌混色，明暗主题都成立 */
+.md :deep(tbody tr:nth-child(even)) {
+  background: color-mix(in srgb, var(--ds-text) 3%, transparent);
+}
+
+/* markdown 的 :---: 对齐落成 align 属性，属性选择器优先级更高，能盖回上面的 left */
+.md :deep([align='center']) {
+  text-align: center;
+}
+
+.md :deep([align='right']) {
+  text-align: right;
 }
 
 .md :deep(input[type='checkbox']) {
