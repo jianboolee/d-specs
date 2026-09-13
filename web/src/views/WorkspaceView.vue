@@ -103,6 +103,18 @@ function previewShare() {
   window.open(shareUrl.value, '_blank', 'noopener')
 }
 
+/** 复制公开链接；未开启分享时不可点，因此 url 必然存在 */
+async function copyShareLink() {
+  if (!shareUrl.value) return
+  try {
+    // 后端返回相对路径，补成完整地址再复制
+    await navigator.clipboard.writeText(`${window.location.origin}${shareUrl.value}`)
+    toast.success('链接已复制')
+  } catch {
+    toast.warning('复制失败，请手动复制')
+  }
+}
+
 /** 分享弹窗里改了状态：重新拉取并同步侧栏 */
 async function onShareChanged() {
   await loadShareStatus()
@@ -375,10 +387,14 @@ async function handleUndoMessage(messageId: string) {
                     <i :class="shareEnabled ? 'ri-link-unlink-m' : 'ri-link'" />
                     {{ shareEnabled ? '关闭分享' : '开启分享' }}
                   </DropdownMenuItem>
-                  <!-- 未开启分享时没有公开地址，预览置灰 -->
+                  <!-- 未开启分享时没有公开地址，预览与复制链接都置灰 -->
                   <DropdownMenuItem :disabled="!shareEnabled" @select="previewShare">
                     <i class="ri-external-link-line" />
                     预览
+                  </DropdownMenuItem>
+                  <DropdownMenuItem :disabled="!shareEnabled" @select="copyShareLink">
+                    <i class="ri-link-m" />
+                    复制链接
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem variant="destructive" @select="removingTable = true">
