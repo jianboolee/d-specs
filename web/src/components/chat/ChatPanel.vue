@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 
+import MarkdownText from './MarkdownText.vue'
 import type { ChatChange } from '@/types/api'
 
 /** 与 chat store 的 UiMessage 结构一致（结构化匹配，不直接依赖 store） */
@@ -117,7 +118,17 @@ function kindLabel(kind: ChatChange['kind']) {
         </div>
 
         <div class="msg-body">
-          <div v-if="msg.text" class="msg-bubble" :class="{ undone: msg.undone }">{{ msg.text }}</div>
+          <!-- assistant 的回复是 Markdown，渲染成富文本；用户输入保持纯文本 -->
+          <div
+            v-if="msg.text && msg.role === 'assistant'"
+            class="msg-bubble"
+            :class="{ undone: msg.undone }"
+          >
+            <MarkdownText :text="msg.text" />
+          </div>
+          <div v-else-if="msg.text" class="msg-bubble" :class="{ undone: msg.undone }">
+            {{ msg.text }}
+          </div>
 
           <div v-if="msg.streaming && !msg.text && !msg.toolLabel" class="msg-bubble typing-bubble">
             <span class="typing"><span /><span /><span /></span>
@@ -352,12 +363,15 @@ function kindLabel(kind: ChatChange['kind']) {
   word-break: break-word;
 }
 
-/* assistant：无气泡，直接流式文字（ChatGPT 风格） */
+/* assistant：无气泡，直接流式文字（ChatGPT 风格）。
+   回复是 Markdown，交给块级容器排版，不用 pre-wrap 保留源码记号 */
 .msg.assistant .msg-bubble {
+  display: block;
   padding: 2px 0;
   background: transparent;
   border: none;
   color: var(--ds-text);
+  white-space: normal;
 }
 
 /* user：浅灰圆角气泡，右下角收小 */
