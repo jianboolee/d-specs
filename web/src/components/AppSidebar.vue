@@ -38,6 +38,26 @@ const filtered = computed(() => {
   return spec.tables.filter((t) => t.title.toLowerCase().includes(kw))
 })
 
+/**
+ * 按置顶与否拆成虚拟分组。
+ *
+ * 服务端已按 pinned DESC, updated_at DESC 返回，filter 保序，
+ * 所以置顶组与其余组内部都仍是「最近更新」顺序。
+ */
+const tableGroups = computed(() => {
+  const pinned = filtered.value.filter((t) => t.pinned)
+  const others = filtered.value.filter((t) => !t.pinned)
+
+  const groups: { label: string; tables: typeof filtered.value }[] = []
+  if (pinned.length > 0) groups.push({ label: '置顶', tables: pinned })
+  // 有置顶时才给其余表加标题：它们的排序就是最近更新；
+  // 没有置顶时不加标题，保持原来的平铺外观
+  if (others.length > 0) {
+    groups.push({ label: pinned.length > 0 ? '最近更新' : '', tables: others })
+  }
+  return groups
+})
+
 const activeId = computed(() => (route.name === 'workspace' ? String(route.params.id ?? '') : ''))
 
 // 停在列表页时，「我的参数表」像被选中的列表条目一样高亮
@@ -137,19 +157,23 @@ onMounted(() => {
 
       <!-- 收起时只保留上面的「我的参数表」，不铺开具体表 -->
       <template v-if="!collapsed">
-        <button
-          v-for="table in filtered"
-          :key="table.id"
-          type="button"
-          class="table-item"
-          :class="{ active: table.id === activeId }"
-          @click="openTable(table.id)"
-        >
-          <!-- 已公开分享：圆点放在左侧图标列，弱提示且不挤占标题 -->
-          <span v-if="table.visibility === 'link'" class="dot-public" title="已公开分享" />
-          <span class="ds-ellipsis">{{ table.title }}</span>
-          <span class="item-count">{{ table.item_count }}</span>
-        </button>
+        <!-- 置顶表单独成组；没有置顶时不显示任何分组标题，保持原来的平铺 -->
+        <template v-for="group in tableGroups" :key="group.label || 'all'">
+          <div v-if="group.label" class="list-group-label">{{ group.label }}</div>
+          <button
+            v-for="table in group.tables"
+            :key="table.id"
+            type="button"
+            class="table-item"
+            :class="{ active: table.id === activeId }"
+            @click="openTable(table.id)"
+          >
+            <!-- 已公开分享：圆点放在左侧图标列，不占位、不影响标题对齐 -->
+            <span v-if="table.visibility === 'link'" class="dot-public" title="已公开分享" />
+            <span class="ds-ellipsis">{{ table.title }}</span>
+            <span class="item-count">{{ table.item_count }}</span>
+          </button>
+        </template>
 
         <div v-if="filtered.length === 0" class="list-empty">
           <template v-if="keyword">没有匹配的参数表</template>
@@ -388,6 +412,13 @@ onMounted(() => {
   font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
   font-variant-numeric: tabular-nums;
+}
+
+/* 分组小标题：不可点击，贴左、不与表条目标题对齐 */
+.list-group-label {
+  padding: 8px 10px;
+  font-size: var(--ds-font-xs);
+  color: var(--ds-text-tertiary);
 }
 
 /* 已公开分享：圆点绝对定位在左侧图标列，不占位、不影响标题对齐 */
