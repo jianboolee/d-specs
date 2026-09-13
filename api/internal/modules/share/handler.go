@@ -148,11 +148,14 @@ func (h *Handler) Sitemap(c *gin.Context) {
 }
 
 // Robots 只放行公开分享页，登录后的应用路由与接口不对外索引。
+//
+// 根地址 / 是项目介绍页、/discover 是公开发现页，两者都可收录，因此不拦。
 func (h *Handler) Robots(c *gin.Context) {
 	lines := []string{
 		"User-agent: *",
 		"Allow: /s/",
 		"Disallow: /tables",
+		"Disallow: /dashboard",
 		"Disallow: /login",
 		"Disallow: /api/",
 	}
