@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CreateTableDialog from '@/components/CreateTableDialog.vue'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useThemeMode } from '@/composables/useThemeMode'
@@ -10,6 +11,8 @@ useThemeMode()
 <template>
   <TooltipProvider>
     <router-view />
+    <!-- 全局唯一的新建弹窗：侧栏/首页/列表页都唤起它，不再靠路由跳转 -->
+    <CreateTableDialog />
     <Toaster />
   </TooltipProvider>
 </template>

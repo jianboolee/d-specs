@@ -17,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/stores/auth'
 import { useSpecTableStore } from '@/stores/specTable'
+import { useCreateTable } from '@/composables/useCreateTable'
 import { useThemeMode } from '@/composables/useThemeMode'
 import { useSidebar } from '@/composables/useSidebar'
 import BrandMark from '@/components/BrandMark.vue'
@@ -25,6 +26,7 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const spec = useSpecTableStore()
+const { open: openCreate } = useCreateTable()
 const { mode: themeMode, toggle: toggleTheme } = useThemeMode()
 const { collapsed, toggle: toggleSidebar } = useSidebar()
 
@@ -57,9 +59,9 @@ function openTable(id: string) {
   void router.push({ name: 'workspace', params: { id } })
 }
 
-// 新建入口落在列表页：它负责弹窗与后续跳转，侧边栏只做导航
+// 直接唤起全局新建弹窗，停在当前页，不再跳到列表页
 function goCreate() {
-  void router.push({ name: 'tables', query: { new: '1' } })
+  openCreate()
 }
 
 // 「全部」直接打开参数表列表页

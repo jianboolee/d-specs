@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
 import AppSidebar from '@/components/AppSidebar.vue'
 import { ApiError } from '@/api/http'
 import { useSpecTableStore } from '@/stores/specTable'
+import { useCreateTable } from '@/composables/useCreateTable'
 import type { TableSummary } from '@/types/api'
 import { formatRelativeTime } from '@/utils/time'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 const router = useRouter()
-const route = useRoute()
 const spec = useSpecTableStore()
 
 onMounted(() => {
@@ -46,52 +45,8 @@ onMounted(() => {
 
 // ---------- 新建 ----------
 
-const showCreate = ref(false)
-const creating = ref(false)
-const form = reactive({ title: '' })
-const createError = ref('')
-
-function openCreate() {
-  form.title = ''
-  createError.value = ''
-  showCreate.value = true
-}
-
-async function submitCreate() {
-  const title = form.title.trim()
-  if (!title) {
-    createError.value = '请输入产品名称'
-    return
-  }
-  if (title.length > 120) {
-    createError.value = '产品名称不能超过 120 字'
-    return
-  }
-
-  creating.value = true
-  try {
-    const res = await spec.createTable({ title })
-    showCreate.value = false
-    toast.success('参数表已创建')
-    await router.push({ name: 'workspace', params: { id: res.table.id } })
-  } catch (err) {
-    toast.error(describe(err))
-  } finally {
-    creating.value = false
-  }
-}
-
-// 侧边栏的「新建参数表」通过 query 把用户送到这里
-watch(
-  () => route.query.new,
-  (flag) => {
-    if (flag === '1') {
-      openCreate()
-      void router.replace({ name: 'tables' })
-    }
-  },
-  { immediate: true },
-)
+// 弹窗由 App 全局挂载一份，这里只负责唤起，避免各自维护
+const { open: openCreate } = useCreateTable()
 
 // ---------- 行操作 ----------
 
@@ -245,41 +200,6 @@ function describe(err: unknown) {
         </div>
       </div>
     </main>
-
-    <!-- 新建参数表 -->
-    <Dialog v-model:open="showCreate">
-      <DialogContent class="sm:max-w-[440px]">
-        <DialogHeader>
-          <DialogTitle>新建参数表</DialogTitle>
-        </DialogHeader>
-
-        <div class="modal-hint">一张表对应一个产品，创建后可以在左侧对话里让 AI 帮你填充参数。</div>
-
-        <form class="modal-form" @submit.prevent="submitCreate">
-          <div class="field">
-            <Label for="create-title">产品名称</Label>
-            <Input
-              id="create-title"
-              v-model="form.title"
-              placeholder="例如：某型号越野房车"
-              maxlength="120"
-              autofocus
-              :aria-invalid="!!createError"
-              @input="createError = ''"
-            />
-            <p v-if="createError" class="field-error">{{ createError }}</p>
-          </div>
-        </form>
-
-        <DialogFooter>
-          <Button variant="outline" :disabled="creating" @click="showCreate = false">取消</Button>
-          <Button :disabled="creating" @click="submitCreate">
-            <i v-if="creating" class="ri-loader-4-line animate-spin" />
-            创建
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
 
     <!-- 重命名 -->
     <Dialog :open="!!renaming" @update:open="(v) => !v && (renaming = null)">
@@ -522,44 +442,5 @@ function describe(err: unknown) {
 
 .time {
   margin-left: auto;
-}
-
-/* 弹窗 */
-
-.modal-hint {
-  margin: 0 0 16px;
-  font-size: var(--ds-font-xs);
-  line-height: 1.7;
-  color: var(--ds-text-tertiary);
-}
-
-.modal-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.modal-form .field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.modal-form .field label {
-  font-size: var(--ds-font-sm);
-  color: var(--ds-text-secondary);
-}
-
-/* 弹窗内输入框比组件默认（h-8）更高 */
-.modal-form :deep(input) {
-  height: 46px;
-  padding-inline: 14px;
-  font-size: var(--ds-font-base);
-}
-
-.field-error {
-  margin: 0;
-  font-size: var(--ds-font-xs);
-  color: #d64545;
 }
 </style>

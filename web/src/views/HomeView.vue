@@ -7,10 +7,12 @@ import BrandMark from '@/components/BrandMark.vue'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth'
 import { useSpecTableStore } from '@/stores/specTable'
+import { useCreateTable } from '@/composables/useCreateTable'
 
 const router = useRouter()
 const auth = useAuthStore()
 const spec = useSpecTableStore()
+const { open: openCreate } = useCreateTable()
 
 const displayName = computed(() => auth.user?.name || auth.user?.email || '')
 
@@ -24,9 +26,6 @@ function goTables() {
   void router.push({ name: 'tables' })
 }
 
-function goCreate() {
-  void router.push({ name: 'tables', query: { new: '1' } })
-}
 </script>
 
 <template>
@@ -49,7 +48,7 @@ function goCreate() {
             <span v-if="tableCount > 0" class="count">{{ tableCount }}</span>
           </Button>
 
-          <Button size="lg" variant="outline" @click="goCreate">
+          <Button size="lg" variant="outline" @click="openCreate">
             <i class="ri-add-line" />
             新建参数表
           </Button>
