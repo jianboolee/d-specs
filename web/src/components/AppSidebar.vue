@@ -14,13 +14,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/stores/auth'
 import { useSpecTableStore } from '@/stores/specTable'
 import { useCreateTable } from '@/composables/useCreateTable'
 import { useThemeMode } from '@/composables/useThemeMode'
 import { useSidebar } from '@/composables/useSidebar'
 import BrandMark from '@/components/BrandMark.vue'
+import TableSearchDialog from '@/components/table/TableSearchDialog.vue'
+import type { TableSummary } from '@/types/api'
 
 const router = useRouter()
 const route = useRoute()
@@ -30,13 +31,7 @@ const { open: openCreate } = useCreateTable()
 const { mode: themeMode, toggle: toggleTheme } = useThemeMode()
 const { collapsed, toggle: toggleSidebar } = useSidebar()
 
-const keyword = ref('')
-
-const filtered = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return spec.tables
-  return spec.tables.filter((t) => t.title.toLowerCase().includes(kw))
-})
+const showSearch = ref(false)
 
 /**
  * 按置顶与否拆成虚拟分组。
@@ -45,10 +40,10 @@ const filtered = computed(() => {
  * 所以置顶组与其余组内部都仍是「最近更新」顺序。
  */
 const tableGroups = computed(() => {
-  const pinned = filtered.value.filter((t) => t.pinned)
-  const others = filtered.value.filter((t) => !t.pinned)
+  const pinned = spec.tables.filter((t) => t.pinned)
+  const others = spec.tables.filter((t) => !t.pinned)
 
-  const groups: { label: string; tables: typeof filtered.value }[] = []
+  const groups: { label: string; tables: TableSummary[] }[] = []
   if (pinned.length > 0) groups.push({ label: '置顶', tables: pinned })
   // 有置顶时才给其余表加标题：它们的排序就是最近更新；
   // 没有置顶时不加标题，保持原来的平铺外观
@@ -92,6 +87,12 @@ function goAll() {
   void router.push({ name: 'tables' })
 }
 
+/** 搜索结果被选中：打开该表并收起搜索面板 */
+function openSearchResult(table: TableSummary) {
+  showSearch.value = false
+  openTable(table.id)
+}
+
 onMounted(() => {
   void spec.loadTables().catch(() => undefined)
 })
@@ -126,24 +127,21 @@ onMounted(() => {
       <span v-if="!collapsed">新建参数表</span>
     </button>
 
-    <div v-if="!collapsed" class="search">
-      <div class="search-box">
-        <i class="ri-search-line" />
-        <Input
-          v-model="keyword"
-          class="search-input"
-          placeholder="搜索参数表"
-          type="search"
-        />
-      </div>
-    </div>
-
-    <div class="table-list ds-scroll-y">
-      <!-- 「我的参数表」：进入列表页的入口，样式与下面的表条目保持一致。
-           它保留图标作为标识（收起时图标也是唯一的可点击标识）。 -->
+    <!-- 新建 / 搜索 / 我的参数表 归为一组：都是「动作」，与下面的表列表分开 -->
+    <div class="sidebar-actions">
       <button
         type="button"
-        class="table-item list-all"
+        class="table-item"
+        :title="collapsed ? '搜索参数表' : undefined"
+        @click="showSearch = true"
+      >
+        <i class="ri-search-line" />
+        <span v-if="!collapsed" class="ds-ellipsis">搜索</span>
+      </button>
+
+      <button
+        type="button"
+        class="table-item"
         :class="{ active: isAllActive }"
         :title="collapsed ? '我的参数表' : undefined"
         @click="goAll"
@@ -154,8 +152,10 @@ onMounted(() => {
           {{ spec.tables.length }}
         </span>
       </button>
+    </div>
 
-      <!-- 收起时只保留上面的「我的参数表」，不铺开具体表 -->
+    <div class="table-list ds-scroll-y">
+      <!-- 收起时只保留上面的入口，不铺开具体表 -->
       <template v-if="!collapsed">
         <!-- 置顶表单独成组；没有置顶时不显示任何分组标题，保持原来的平铺 -->
         <template v-for="group in tableGroups" :key="group.label || 'all'">
@@ -175,9 +175,8 @@ onMounted(() => {
           </button>
         </template>
 
-        <div v-if="filtered.length === 0" class="list-empty">
-          <template v-if="keyword">没有匹配的参数表</template>
-          <template v-else-if="spec.listLoading">加载中…</template>
+        <div v-if="spec.tables.length === 0" class="list-empty">
+          <template v-if="spec.listLoading">加载中…</template>
           <template v-else>还没有参数表<br />点上方按钮创建第一张</template>
         </div>
       </template>
@@ -209,6 +208,9 @@ onMounted(() => {
       </DropdownMenu>
     </div>
   </aside>
+
+  <!-- 搜索面板：居中弹出，查询只覆盖当前用户自己的表 -->
+  <TableSearchDialog v-model:open="showSearch" @select="openSearchResult" />
 </template>
 
 <style scoped>
@@ -228,10 +230,10 @@ onMounted(() => {
   width: 64px;
 }
 
-/* 侧边栏的头部/按钮/搜索/底部都要固定，只有列表滚动 */
+/* 侧边栏的头部/新建/动作组/底部都要固定，只有列表滚动 */
 .sidebar-head,
 .new-btn,
-.search,
+.sidebar-actions,
 .sidebar-foot {
   flex: none;
 }
@@ -310,40 +312,10 @@ onMounted(() => {
   justify-content: center;
 }
 
-.search {
-  padding: 2px 12px 6px;
-}
-
-.search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-box > i {
-  position: absolute;
-  left: 13px;
-  color: var(--ds-text-tertiary);
-  font-size: 17px;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.search-input {
-  padding-left: 38px;
-  height: 38px;
-  border-radius: var(--ds-radius);
-  /* 侧栏是浅灰底，输入框用白底填充，更有存在感 */
-  background: var(--ds-surface);
-  font-size: var(--ds-font-sm);
-}
-
-.search-input:hover {
-  border-color: var(--ds-border-strong);
-}
-
-.search-input:focus-visible {
-  border-color: var(--ds-text-tertiary);
+/* 新建 / 搜索 / 我的参数表：三个动作收在一组，与下面的表列表用分隔线分开 */
+.sidebar-actions {
+  padding: 2px 8px 8px;
+  border-bottom: 1px solid var(--ds-border);
 }
 
 .table-list {
@@ -352,15 +324,9 @@ onMounted(() => {
   padding: 12px 8px;
 }
 
-/* 「我的参数表」是分组入口（带图标），下面的表条目是它的子项。
-   子项缩进到与入口文字左对齐，形成层级；不用加粗，选中态也只靠底色区分。 */
-.list-all {
-  margin-bottom: 6px;
-}
-
-/* 左边距 = 入口的 padding-left(10) + 图标(18) + gap(10)，让子项文字与入口文字对齐。
+/* 列表里的表条目缩进到图标列右侧，给左侧的公开圆点留出位置。
    同时作为圆点的定位容器。 */
-.table-item:not(.list-all) {
+.table-list .table-item {
   position: relative;
   padding-left: 38px;
 }

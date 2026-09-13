@@ -17,7 +17,6 @@ export const useSpecTableStore = defineStore('specTable', () => {
   // ---------- 列表 ----------
   const tables = ref<TableSummary[]>([])
   const listLoading = ref(false)
-  const keyword = ref('')
 
   // ---------- 当前表 ----------
   const table = ref<TableDetail | null>(null)
@@ -56,7 +55,7 @@ export const useSpecTableStore = defineStore('specTable', () => {
   async function loadTables() {
     listLoading.value = true
     try {
-      const res = await api.listTables({ keyword: keyword.value, size: 100 })
+      const res = await api.listTables({ size: 100 })
       tables.value = res.items
     } finally {
       listLoading.value = false
@@ -263,7 +262,6 @@ export const useSpecTableStore = defineStore('specTable', () => {
     // 列表
     tables,
     listLoading,
-    keyword,
     loadTables,
     createTable,
     removeTable,
