@@ -7,6 +7,7 @@ import AppSidebar from '@/components/AppSidebar.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import ShareDialog from '@/components/table/ShareDialog.vue'
 import SpecCanvas from '@/components/table/SpecCanvas.vue'
+import { useCanvas } from '@/composables/useCanvas'
 import { ApiError } from '@/api/http'
 import * as shareApi from '@/api/share'
 import { useChatStore } from '@/stores/chat'
@@ -50,6 +51,9 @@ const route = useRoute()
 const router = useRouter()
 const spec = useSpecTableStore()
 const chat = useChatStore()
+
+// 画布收起状态：收起按钮在 SpecCanvas 头部，收起后由 chat-head 右侧按钮还原
+const { collapsed: canvasCollapsed, toggle: toggleCanvas } = useCanvas()
 
 const tableId = computed(() => String(route.params.id ?? ''))
 
@@ -447,6 +451,21 @@ async function handleUndoMessage(messageId: string) {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">新建对话</TooltipContent>
+              </Tooltip>
+
+              <!-- 画布收起后从头部还原，收起按钮在画布自己的头部（见 SpecCanvas） -->
+              <Tooltip v-if="canvasCollapsed">
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    class="head-btn"
+                    aria-label="展开画布"
+                    @click="toggleCanvas"
+                  >
+                    <i class="ri-layout-right-line" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">展开画布</TooltipContent>
               </Tooltip>
             </div>
           </header>

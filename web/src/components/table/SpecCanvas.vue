@@ -2,6 +2,7 @@
 import { computed, nextTick, ref } from 'vue'
 
 import type { SpecItem } from '@/types/api'
+import { useCanvas } from '@/composables/useCanvas'
 import {
   Tooltip,
   TooltipContent,
@@ -41,6 +42,8 @@ const emit = defineEmits<{
   undo: []
   redo: []
 }>()
+
+const { collapsed, toggle: toggleCanvas } = useCanvas()
 
 interface ItemGroup {
   name: string
@@ -122,7 +125,8 @@ function isHighlighted(id: string) {
 </script>
 
 <template>
-  <section class="canvas">
+  <!-- 收起后宽度为 0，inert 让内部按钮一并退出键盘焦点顺序 -->
+  <section class="canvas" :class="{ collapsed }" :inert="collapsed">
     <header class="canvas-head">
       <span v-if="saving" class="saving">
         <i class="ri-loader-4-line spin" />
@@ -179,6 +183,21 @@ function isHighlighted(id: string) {
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom">生成只读链接分享这张表</TooltipContent>
+        </Tooltip>
+
+        <!-- 收起后画布完全让位给对话区，从对话头部按钮还原（见 WorkspaceView） -->
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="ghost-btn icon-only"
+              aria-label="收起画布"
+              @click="toggleCanvas"
+            >
+              <i class="ri-layout-right-line" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">收起画布</TooltipContent>
         </Tooltip>
       </div>
     </header>
@@ -286,6 +305,13 @@ function isHighlighted(id: string) {
   overflow: hidden;
   background: var(--ds-surface);
   border-left: 1px solid var(--ds-border);
+  transition: width 0.2s ease;
+}
+
+/* 收起：宽度归零让位给对话区，边框一并去掉避免残留 1px 竖线 */
+.canvas.collapsed {
+  width: 0;
+  border-left-width: 0;
 }
 
 .canvas-head {
@@ -403,10 +429,6 @@ function isHighlighted(id: string) {
   padding: 56px 0;
   text-align: center;
   color: var(--ds-text-tertiary);
-}
-
-.canvas-empty i {
-  font-size: 34px;
 }
 
 .canvas-empty p {
