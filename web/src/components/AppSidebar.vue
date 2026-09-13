@@ -128,7 +128,7 @@ onMounted(() => {
         :title="collapsed ? '我的参数表' : undefined"
         @click="goAll"
       >
-        <i class="ri-file-list-3-line" />
+        <i class="ri-folder-line" />
         <span v-if="!collapsed" class="ds-ellipsis">我的参数表</span>
         <span v-if="!collapsed && spec.tables.length > 0" class="item-count">
           {{ spec.tables.length }}
