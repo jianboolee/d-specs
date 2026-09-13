@@ -144,11 +144,26 @@ function isHighlighted(id: string) {
     :inert="hidden"
   >
     <header class="canvas-head">
-      <span v-if="saving" class="saving">
-        <i class="ri-loader-4-line spin" />
-        保存中
-      </span>
-      <span v-else class="revision">版本: r{{ revision }}</span>
+      <div class="canvas-head-left">
+        <!-- 手机上画布是从右侧滑入的抽屉，关闭放最左：它是「退出这一层」，
+             与右侧的撤销/重做/分享（都是对内容做动作）分开放，不易误点。
+             刻意用 ✕ 而不是左箭头，避免被理解成浏览器后退。 -->
+        <button
+          v-if="isMobile"
+          type="button"
+          class="ghost-btn icon-only close-btn"
+          aria-label="关闭参数表"
+          @click="closeCanvas"
+        >
+          <i class="ri-close-line" />
+        </button>
+
+        <span v-if="saving" class="saving">
+          <i class="ri-loader-4-line spin" />
+          保存中
+        </span>
+        <span v-else class="revision">版本: r{{ revision }}</span>
+      </div>
 
       <div class="canvas-actions">
         <Tooltip>
@@ -201,23 +216,9 @@ function isHighlighted(id: string) {
           <TooltipContent side="bottom">生成只读链接分享这张表</TooltipContent>
         </Tooltip>
 
-        <!-- 手机上画布是全屏覆盖层，这个按钮是关闭；桌面则是收起成 0 宽 -->
-        <Tooltip v-if="isMobile">
-          <TooltipTrigger as-child>
-            <button
-              type="button"
-              class="ghost-btn icon-only"
-              aria-label="关闭参数表"
-              @click="closeCanvas"
-            >
-              <i class="ri-close-line" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">关闭</TooltipContent>
-        </Tooltip>
-
-        <!-- 收起后画布完全让位给对话区，从对话头部按钮还原（见 WorkspaceView） -->
-        <Tooltip v-else>
+        <!-- 桌面：收起画布成 0 宽，从对话头部按钮还原（见 WorkspaceView）。
+             手机上画布是覆盖层，用不着收起态，关闭按钮已在头部最左 -->
+        <Tooltip v-if="!isMobile">
           <TooltipTrigger as-child>
             <button
               type="button"
@@ -375,6 +376,14 @@ function isHighlighted(id: string) {
   height: 56px;
 }
 
+/* 左侧一组：手机上是「关闭 + 版本号」，桌面只有版本号 */
+.canvas-head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .canvas-actions {
   display: flex;
   align-items: center;
@@ -445,6 +454,14 @@ function isHighlighted(id: string) {
   padding: 0;
   justify-content: center;
   font-size: 18px;
+}
+
+/* 关闭按钮：它是「退出这一层」，不铺底色，避免看起来像撤销/分享那样的内容操作。
+   连 hover 也不铺底色，只让图标颜色变深作为反馈。 */
+.ghost-btn.close-btn,
+.ghost-btn.close-btn:hover {
+  background: transparent;
+  color: var(--ds-text-secondary);
 }
 
 /* 承接被禁用按钮的指针事件（见模板注释） */
