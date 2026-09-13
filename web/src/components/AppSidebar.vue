@@ -102,7 +102,7 @@ onMounted(() => {
   <aside class="sidebar" :class="{ collapsed }">
     <div class="sidebar-head">
       <template v-if="!collapsed">
-        <button class="brand-btn" type="button" title="返回首页" @click="router.push({ name: 'home' })">
+        <button class="brand-btn" type="button" title="返回工作台" @click="router.push({ name: 'dashboard' })">
           <BrandMark :size="26" />
         </button>
       </template>

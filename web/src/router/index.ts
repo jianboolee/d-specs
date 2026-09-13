@@ -7,10 +7,17 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
-      // 首页固定是欢迎页，不再直接铺开参数表卡片
+      // 根地址是项目介绍页：公开、可被收录，不依赖登录态
       path: '/',
-      name: 'home',
-      component: () => import('@/views/HomeView.vue'),
+      name: 'landing',
+      component: () => import('@/views/LandingView.vue'),
+      meta: { public: true },
+    },
+    {
+      // 工作台＝登录后的入口页（原首页内容搬到这里）
+      path: '/dashboard',
+      name: 'dashboard',
+      component: () => import('@/views/DashboardView.vue'),
     },
     {
       path: '/login',
@@ -35,6 +42,13 @@ const router = createRouter({
       name: 'share',
       component: () => import('@/views/ShareView.vue'),
       meta: { public: true, layout: 'standalone' },
+    },
+    {
+      // 发现页：罗列所有已发布（分享开启中）的参数表，无需登录
+      path: '/discover',
+      name: 'discover',
+      component: () => import('@/views/DiscoverView.vue'),
+      meta: { public: true },
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],

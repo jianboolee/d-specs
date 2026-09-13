@@ -132,7 +132,7 @@ function describe(err: unknown) {
     <main class="main">
       <header class="topbar">
         <div class="topbar-title">
-          <button type="button" class="back-btn" title="返回首页" @click="router.push({ name: 'home' })">
+          <button type="button" class="back-btn" title="返回工作台" @click="router.push({ name: 'dashboard' })">
             <i class="ri-arrow-left-line" />
           </button>
           <h2>我的参数表</h2>
