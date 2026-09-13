@@ -289,7 +289,6 @@ async function handleUndoMessage(messageId: string) {
           <header class="chat-head">
             <div class="head-text">
               <span class="head-title ds-ellipsis" :title="title">{{ title }}</span>
-              <span v-if="description" class="head-sub ds-ellipsis">{{ description }}</span>
             </div>
 
             <div class="head-actions">
@@ -356,6 +355,7 @@ async function handleUndoMessage(messageId: string) {
 
         <SpecCanvas
           :items="spec.items"
+          :description="description"
           :highlight-ids="spec.highlightIds"
           :revision="revision"
           :saving="spec.saving"
@@ -548,11 +548,6 @@ async function handleUndoMessage(messageId: string) {
   font-weight: 600;
   color: var(--ds-text);
   line-height: 1.3;
-}
-
-.head-sub {
-  font-size: var(--ds-font-xs);
-  color: var(--ds-text-tertiary);
 }
 
 .head-actions {

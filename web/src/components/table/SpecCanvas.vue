@@ -11,6 +11,8 @@ import {
 const props = withDefaults(
   defineProps<{
     items: SpecItem[]
+    /** 表简介，有内容时展示在参数列表上方 */
+    description?: string
     highlightIds?: string[]
     revision?: number
     saving?: boolean
@@ -19,6 +21,7 @@ const props = withDefaults(
     readonly?: boolean
   }>(),
   {
+    description: '',
     highlightIds: () => [],
     revision: 0,
     saving: false,
@@ -181,6 +184,9 @@ function isHighlighted(id: string) {
     </header>
 
     <div class="canvas-body ds-scroll-y">
+      <!-- 表简介：从头部挪到正文，空间更宽裕，长描述也能完整读到 -->
+      <p v-if="description" class="canvas-desc">{{ description }}</p>
+
       <div v-if="items.length === 0 && addingGroup === null" class="canvas-empty">
         <i class="ri-table-line" />
         <p>这张表还没有参数<br />点下面的按钮手动添加，或在左侧对话里让 AI 帮你建</p>
@@ -378,6 +384,19 @@ function isHighlighted(id: string) {
   flex: 1;
   min-height: 0;
   padding: 16px 18px 28px;
+}
+
+/* 表简介：浅底块，与参数表内容区分开 */
+.canvas-desc {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--ds-surface-muted);
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-font-xs);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .canvas-empty {
