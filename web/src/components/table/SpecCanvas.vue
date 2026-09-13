@@ -338,7 +338,7 @@ function isHighlighted(id: string) {
   padding: 6px 12px;
   border-radius: 8px;
   background: var(--ds-surface-muted);
-  color: var(--ds-text-secondary);
+  color: var(--ds-icon);
   font-size: var(--ds-font-xs);
   cursor: pointer;
 }
@@ -355,13 +355,13 @@ function isHighlighted(id: string) {
   pointer-events: none;
 }
 
-/* 去掉文案后的图标按钮：收成与 chat-head 一致的方形热区 */
+/* 去掉文案后的图标按钮：与 chat-head 的 head-btn 保持同一尺寸 */
 .ghost-btn.icon-only {
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   justify-content: center;
-  font-size: var(--ds-font-base);
+  font-size: 18px;
 }
 
 /* 承接被禁用按钮的指针事件（见模板注释） */

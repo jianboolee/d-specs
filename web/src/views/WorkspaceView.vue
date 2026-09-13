@@ -545,15 +545,15 @@ async function handleUndoMessage(messageId: string) {
 
 .head-btn {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--ds-text-secondary);
-  font-size: var(--ds-font-base);
+  color: var(--ds-icon);
+  font-size: 18px;
   cursor: pointer;
 }
 

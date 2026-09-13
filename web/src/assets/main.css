@@ -12,6 +12,8 @@
   --ds-text: #000000;
   --ds-text-secondary: #6b6b6b;
   --ds-text-tertiary: #5d5d5d;
+  /* 工具栏图标按钮的默认色：比 secondary 更深，浅色下才够清晰 */
+  --ds-icon: #3d3d3d;
 
   --ds-primary: #1a1a1a;
   --ds-primary-hover: #333333;
@@ -47,6 +49,8 @@ html[data-theme='dark'] {
   --ds-text: #ececec;
   --ds-text-secondary: #b4b4b4;
   --ds-text-tertiary: #8a8a8a;
+  /* 深色下沿用原本的 secondary 观感，避免图标过亮抢正文 */
+  --ds-icon: #b4b4b4;
 
   --ds-primary: #ececec;
   --ds-primary-hover: #ffffff;
