@@ -78,6 +78,7 @@ func (s *Service) UpdateMeta(ctx context.Context, userID, tableID string, req Up
 		Description: req.Description,
 		Industry:    req.Industry,
 		Tags:        req.Tags,
+		Pinned:      req.Pinned,
 	})
 	if err != nil {
 		return nil, err

@@ -21,6 +21,8 @@ type UpdateRequest struct {
 	Description *string   `json:"description" binding:"omitempty,max=2000"`
 	Industry    *string   `json:"industry" binding:"omitempty,max=64"`
 	Tags        *[]string `json:"tags" binding:"omitempty,max=8,dive,max=24"`
+	// Pinned 用户级置顶开关
+	Pinned *bool `json:"pinned"`
 }
 
 type DuplicateRequest struct {
@@ -51,6 +53,7 @@ type TableSummary struct {
 	Industry        string    `gorm:"column:industry" json:"industry"`
 	Tags            []string  `gorm:"column:tags;serializer:json" json:"tags"`
 	Visibility      string    `gorm:"column:visibility" json:"visibility"`
+	Pinned          bool      `gorm:"column:pinned" json:"pinned"`
 	CurrentRevision int       `gorm:"column:current_revision" json:"current_revision"`
 	ItemCount       int       `gorm:"column:item_count" json:"item_count"`
 	CreatedAt       time.Time `gorm:"column:created_at" json:"created_at"`
@@ -72,6 +75,7 @@ type TableDetail struct {
 	Industry        string    `json:"industry"`
 	Tags            []string  `json:"tags"`
 	Visibility      string    `json:"visibility"`
+	Pinned          bool      `json:"pinned"`
 	CurrentRevision int       `json:"current_revision"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
@@ -89,6 +93,7 @@ func toTableDetail(t *SpecTable) TableDetail {
 		Industry:        t.Industry,
 		Tags:            tags,
 		Visibility:      t.Visibility,
+		Pinned:          t.Pinned,
 		CurrentRevision: t.CurrentRevision,
 		CreatedAt:       t.CreatedAt,
 		UpdatedAt:       t.UpdatedAt,

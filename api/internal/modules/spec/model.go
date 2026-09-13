@@ -19,6 +19,9 @@ type SpecTable struct {
 	// Tags 产品类型标签，由 AI 分析写入；JSONB 数组，nil 会在落库前归一到 []
 	Tags       []string `gorm:"column:tags;serializer:json"`
 	Visibility string   `gorm:"column:visibility"`
+	// Pinned 用户级置顶：为 true 时在列表里排到最前。
+	// 表本身归属某个用户，因此这个标记天然按用户隔离。
+	Pinned bool `gorm:"column:pinned"`
 	// CurrentRevision 乐观锁 + 版本号；写操作必须带上期望值比对
 	CurrentRevision int        `gorm:"column:current_revision"`
 	CreatedAt       time.Time  `gorm:"column:created_at"`

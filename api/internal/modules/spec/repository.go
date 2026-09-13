@@ -56,9 +56,10 @@ func (r *Repository) ListTables(ctx context.Context, userID, keyword string, off
 	// 参数项数量用相关子查询一次带出，避免 N+1
 	var rows []TableSummary
 	err := query.
-		Select("id, title, description, industry, tags, visibility, current_revision, created_at, updated_at, " +
+		Select("id, title, description, industry, tags, visibility, pinned, current_revision, created_at, updated_at, " +
 			"(SELECT COUNT(*) FROM spec_items WHERE spec_items.table_id = spec_tables.id) AS item_count").
-		Order("updated_at DESC").Offset(offset).Limit(limit).
+		// 置顶的排最前，其内与其余表一样按最近更新
+		Order("pinned DESC, updated_at DESC").Offset(offset).Limit(limit).
 		Scan(&rows).Error
 	if err != nil {
 		return nil, 0, err
@@ -136,6 +137,7 @@ type TablePatch struct {
 	Description *string
 	Industry    *string
 	Tags        *[]string
+	Pinned      *bool
 }
 
 // normalizeTags 去掉空白项、去重并保留顺序，最多 8 个。
@@ -188,6 +190,9 @@ func (r *Repository) UpdateTableMeta(ctx context.Context, userID, tableID string
 			return nil, err
 		}
 		updates["tags"] = gorm.Expr("?::jsonb", string(raw))
+	}
+	if patch.Pinned != nil {
+		updates["pinned"] = *patch.Pinned
 	}
 	if len(updates) == 0 {
 		return r.GetTable(ctx, userID, tableID)
