@@ -63,7 +63,7 @@ onMounted(() => {
       <div class="head-actions">
         <button type="button" class="head-link" @click="goDiscover">发现</button>
         <Button v-if="auth.isLoggedIn" size="sm" @click="goDashboard">进入工作台</Button>
-        <Button v-else size="sm" @click="goLogin">登录</Button>
+        <Button v-else size="sm" @click="goLogin">开始</Button>
       </div>
     </header>
 
@@ -81,8 +81,8 @@ onMounted(() => {
             进入工作台
           </Button>
           <Button v-else size="lg" @click="goLogin">
-            <i class="ri-login-box-line" />
-            登录 / 注册
+            <i class="ri-arrow-right-line" />
+            开始
           </Button>
           <Button size="lg" variant="outline" @click="goDiscover">
             <i class="ri-compass-3-line" />
