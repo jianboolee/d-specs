@@ -34,6 +34,7 @@ const emit = defineEmits<{
     draft: { name: string; value: string; group_name: string; value_type: 'text' | 'number' },
   ]
   'remove-item': [itemId: string, name: string]
+  share: []
   undo: []
   redo: []
 }>()
@@ -160,6 +161,21 @@ function isHighlighted(id: string) {
             </span>
           </TooltipTrigger>
           <TooltipContent side="bottom">重做</TooltipContent>
+        </Tooltip>
+
+        <!-- 分享是核心能力：常驻工具栏，与撤销/重做同款图标按钮 -->
+        <Tooltip v-if="!readonly">
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="ghost-btn icon-only"
+              aria-label="分享"
+              @click="emit('share')"
+            >
+              <i class="ri-share-forward-line" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">生成只读链接分享这张表</TooltipContent>
         </Tooltip>
       </div>
     </header>

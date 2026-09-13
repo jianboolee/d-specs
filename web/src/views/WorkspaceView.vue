@@ -293,10 +293,6 @@ async function handleUndoMessage(messageId: string) {
                     <i class="ri-edit-line" />
                     重命名
                   </DropdownMenuItem>
-                  <DropdownMenuItem @select="showShare = true">
-                    <i class="ri-share-forward-line" />
-                    分享
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem variant="destructive" @select="removingTable = true">
                     <i class="ri-delete-bin-line" />
@@ -350,6 +346,7 @@ async function handleUndoMessage(messageId: string) {
           @update-item="handleUpdateItem"
           @add-item="handleAddItem"
           @remove-item="handleRemoveItem"
+          @share="showShare = true"
           @undo="handleUndo"
           @redo="handleRedo"
         />
