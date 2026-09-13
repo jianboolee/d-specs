@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import { pinia } from '@/stores'
+import { useMobileShell } from '@/composables/useMobileShell'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -70,6 +71,12 @@ router.beforeEach(async (to) => {
   }
 
   return true
+})
+
+// 抽屉/画布覆盖层是临时状态，哪怕导航完成也要关掉：用返回键或链接离开时，
+// 状态若留着，遮罩会在新页面上重新渲染成一层甩不掉的蒙层。
+router.afterEach(() => {
+  useMobileShell().closeAll()
 })
 
 export default router
