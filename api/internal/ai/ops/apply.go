@@ -51,7 +51,16 @@ func Validate(s Snapshot, operations []Op) []error {
 	return []error{err}
 }
 
-var knownOps = []string{OpAddItem, OpAddItems, OpUpdateItem, OpDeleteItem, OpReorderItems, OpSetGroup}
+var knownOps = []string{
+	OpAddItem, OpAddItems, OpUpdateItem, OpDeleteItem, OpReorderItems, OpSetGroup,
+	OpSetTableTitle, OpSetTableDescription,
+}
+
+// 表级元信息的上限，与 spec 模块 DTO 的 binding 保持一致
+const (
+	maxTitleLen       = 120
+	maxDescriptionLen = 2000
+)
 
 func applyAll(s *Snapshot, operations []Op) ([]Change, []error) {
 	var changes []Change
@@ -90,9 +99,64 @@ func applyOne(s *Snapshot, op Op, label string) ([]Change, []error) {
 		return applyReorder(s, op, label)
 	case OpSetGroup:
 		return applySetGroup(s, op, label)
+	case OpSetTableTitle:
+		return applySetTableTitle(s, op, label)
+	case OpSetTableDescription:
+		return applySetTableDescription(s, op, label)
 	default:
 		return nil, []error{fmt.Errorf("%s：未知操作类型 %q（可用：%s）", label, op.Op, strings.Join(knownOps, "、"))}
 	}
+}
+
+// ==================== 表级元信息 ====================
+
+// applySetTableTitle 重命名整张表。
+//
+// 只改 Snapshot 里的标题；真正的落库由调用方走元信息路径完成
+// （不产生 revision，所以不可通过撤销回退）。
+func applySetTableTitle(s *Snapshot, op Op, label string) ([]Change, []error) {
+	title := strings.TrimSpace(op.Title)
+	if title == "" {
+		return nil, []error{fmt.Errorf("%s：表标题不能为空", label)}
+	}
+	if len([]rune(title)) > maxTitleLen {
+		return nil, []error{fmt.Errorf("%s：表标题过长（%d 字），上限 %d 字", label, len([]rune(title)), maxTitleLen)}
+	}
+	if title == s.Title {
+		return nil, []error{fmt.Errorf("%s：新标题与当前标题相同，无需修改", label)}
+	}
+
+	old := s.Title
+	s.Title = title
+	return []Change{{
+		Kind:     ChangeTable,
+		Name:     "表标题",
+		OldValue: old,
+		NewValue: title,
+	}}, nil
+}
+
+// applySetTableDescription 修改表描述；传空字符串表示清空。
+func applySetTableDescription(s *Snapshot, op Op, label string) ([]Change, []error) {
+	if op.Description == nil {
+		return nil, []error{fmt.Errorf("%s：缺少 description 字段", label)}
+	}
+	desc := strings.TrimSpace(*op.Description)
+	if len([]rune(desc)) > maxDescriptionLen {
+		return nil, []error{fmt.Errorf("%s：表描述过长（%d 字），上限 %d 字", label, len([]rune(desc)), maxDescriptionLen)}
+	}
+	if desc == s.Description {
+		return nil, []error{fmt.Errorf("%s：新描述与当前描述相同，无需修改", label)}
+	}
+
+	old := s.Description
+	s.Description = desc
+	return []Change{{
+		Kind:     ChangeTable,
+		Name:     "表描述",
+		OldValue: old,
+		NewValue: desc,
+	}}, nil
 }
 
 // ==================== add ====================

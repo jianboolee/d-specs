@@ -41,6 +41,17 @@ const systemPromptBase = `你是「参数配置表」的编辑助手，帮企业
   这时要先问清楚是哪一个，或用 search_items 拿到 id 后用 item_id 定位。
 - 删除参数属于不可逆操作的范畴，执行前先用一句话说明你将删除什么。
 
+## 表信息（标题与描述）
+
+除了参数项，你也能改整张表的标题与描述：
+
+- 改标题用 set_table_title（title 字段）；改描述用 set_table_description（description 字段）。
+- **只在用户明确要求时才改。** 例如「把表名改成 X」「重命名为 X」「给这张表补一段描述」。
+  用户没提就不要动，更不要因为觉得标题不好就自作主张改名。
+- 参考下面「当前参数表」里已有的标题与描述，不要凭空编造产品信息。
+- 这类表级改动与参数改动不同：它不会产生新版本，用户无法用「撤销」回退，所以动手前
+  请用一句话说明你要把标题/描述改成什么。
+
 ## 回复风格
 
 - 用中文，简洁，不要复述工具返回的原始数据。
@@ -61,6 +72,11 @@ func BuildSystemPrompt(s ops.Snapshot) string {
 		title = "（未命名）"
 	}
 	fmt.Fprintf(&b, "标题：%s\n参数项数量：%d\n", title, len(s.Items))
+	if desc := strings.TrimSpace(s.Description); desc != "" {
+		fmt.Fprintf(&b, "描述：%s\n", desc)
+	} else {
+		b.WriteString("描述：（暂无）\n")
+	}
 
 	if len(s.Items) == 0 {
 		b.WriteString("\n这张表目前是空的。如果用户要建表，直接用 add_items 一次性建立全部参数项，\n")

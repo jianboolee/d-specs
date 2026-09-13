@@ -15,7 +15,19 @@ const (
 	OpDeleteItem   = "delete_item"
 	OpReorderItems = "reorder_items"
 	OpSetGroup     = "set_group"
+
+	// 表级元信息操作。与参数项操作不同，它们不改动参数内容，
+	// 落库时走元信息路径（不产生 revision），因此不可通过画布撤销。
+	OpSetTableTitle       = "set_table_title"
+	OpSetTableDescription = "set_table_description"
 )
+
+// IsTableOp 判断是否为表级元信息操作。
+//
+// 落库时据此分流：参数 op 走版本化 Apply，表级 op 走元信息更新。
+func IsTableOp(op string) bool {
+	return op == OpSetTableTitle || op == OpSetTableDescription
+}
 
 // 参数值类型
 const (
@@ -60,12 +72,14 @@ type Item struct {
 // Snapshot 一张参数表的完整状态
 type Snapshot struct {
 	Title string `json:"title"`
-	Items []Item `json:"items"`
+	// Description 表描述。表级 op 需要它来计算变更前后的值。
+	Description string `json:"description"`
+	Items       []Item `json:"items"`
 }
 
 // Clone 深拷贝，避免 Apply 过程中污染调用方持有的快照
 func (s Snapshot) Clone() Snapshot {
-	out := Snapshot{Title: s.Title, Items: make([]Item, len(s.Items))}
+	out := Snapshot{Title: s.Title, Description: s.Description, Items: make([]Item, len(s.Items))}
 	copy(out.Items, s.Items)
 	for i := range out.Items {
 		if s.Items[i].EnumOptions != nil {
@@ -202,6 +216,11 @@ type Op struct {
 	// 分组
 	ItemIDs   []string `json:"item_ids,omitempty"`
 	GroupName string   `json:"group_name,omitempty"`
+
+	// 表级元信息：set_table_title / set_table_description 使用。
+	// Title 直接取字符串；Description 用指针以区分「不传」与「传空清空描述」。
+	Title       string  `json:"title,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // ChangeKind 变更类型
@@ -212,6 +231,8 @@ const (
 	ChangeUpdate ChangeKind = "update"
 	ChangeDelete ChangeKind = "delete"
 	ChangeMove   ChangeKind = "move"
+	// ChangeTable 表级元信息变更（标题/描述），不代表参数内容变化
+	ChangeTable ChangeKind = "table"
 )
 
 // Change 单条变更记录，用于前端高亮与审计
@@ -221,6 +242,10 @@ type Change struct {
 	Name   string     `json:"name"`
 	Before *Item      `json:"before,omitempty"`
 	After  *Item      `json:"after,omitempty"`
+
+	// OldValue / NewValue 承载非参数项变更的前后值（目前仅表级元信息）
+	OldValue string `json:"old_value,omitempty"`
+	NewValue string `json:"new_value,omitempty"`
 }
 
 func normalizeName(name string) string {

@@ -93,7 +93,7 @@ func Definitions() []provider.Tool {
 		),
 		provider.NewFunctionTool(
 			ToolProposeOps,
-			"提交对参数表的修改。这是唯一能改动数据的方式，所有变更都必须通过它提交。修改前请先确认目标参数项确实存在（用 get_schema 或 search_items 查过），不要凭猜测填参数名。",
+			"提交对参数表的修改。这是唯一能改动数据的方式，所有变更都必须通过它提交。修改前请先确认目标参数项确实存在（用 get_schema 或 search_items 查过），不要凭猜测填参数名。除参数项外，也可以用 set_table_title / set_table_description 修改整张表的标题与描述——但仅在用户明确要求时这么做，不要主动改。",
 			objectSchema(map[string]any{
 				"summary": map[string]any{
 					"type":        "string",
@@ -118,8 +118,9 @@ func opSchema() map[string]any {
 				"enum": []string{
 					ops.OpAddItem, ops.OpAddItems, ops.OpUpdateItem,
 					ops.OpDeleteItem, ops.OpReorderItems, ops.OpSetGroup,
+					ops.OpSetTableTitle, ops.OpSetTableDescription,
 				},
-				"description": "操作类型。add_item=新增一条；add_items=批量新增；update_item=修改；delete_item=删除；reorder_items=调整顺序；set_group=调整分组",
+				"description": "操作类型。add_item=新增一条；add_items=批量新增；update_item=修改；delete_item=删除；reorder_items=调整顺序；set_group=调整分组；set_table_title=修改整张表的标题；set_table_description=修改整张表的描述",
 			},
 			"item_id": map[string]any{
 				"type":        "string",
@@ -175,6 +176,14 @@ func opSchema() map[string]any {
 			"group_name": map[string]any{
 				"type":        "string",
 				"description": "set_group 使用：目标分组名，传空字符串表示移出分组",
+			},
+			"title": map[string]any{
+				"type":        "string",
+				"description": "set_table_title 使用：整张参数表的新标题。仅在用户明确要求改名时填写",
+			},
+			"description": map[string]any{
+				"type":        "string",
+				"description": "set_table_description 使用：整张参数表的新描述（一两句话概括这个产品）。仅在用户明确要求补充或修改描述时填写；传空字符串表示清空",
 			},
 		},
 		"required": []string{"op"},

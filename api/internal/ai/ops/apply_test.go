@@ -592,3 +592,122 @@ func TestSnapshotHelpers(t *testing.T) {
 		}
 	})
 }
+
+// ==================== 表级元信息 ====================
+
+func TestSetTableTitle(t *testing.T) {
+	t.Run("改名成功并记录前后值", func(t *testing.T) {
+		base := snapshot()
+		base.Description = "旧描述"
+		next, changes, err := Apply(base, []Op{{Op: OpSetTableTitle, Title: "  示例手机 A2  "}})
+		if err != nil {
+			t.Fatalf("不应报错: %v", err)
+		}
+		if next.Title != "示例手机 A2" {
+			t.Fatalf("标题应被 trim 后写入，实际 %q", next.Title)
+		}
+		// 描述不受改名影响
+		if next.Description != "旧描述" {
+			t.Fatalf("改名不应改动描述，实际 %q", next.Description)
+		}
+		if len(changes) != 1 || changes[0].Kind != ChangeTable {
+			t.Fatalf("应产出 1 条表级变更，实际 %+v", changes)
+		}
+		if changes[0].OldValue != "示例手机 A1" || changes[0].NewValue != "示例手机 A2" {
+			t.Fatalf("前后值不对: %+v", changes[0])
+		}
+	})
+
+	t.Run("空标题被拒绝", func(t *testing.T) {
+		if _, _, err := Apply(snapshot(), []Op{{Op: OpSetTableTitle, Title: "   "}}); err == nil {
+			t.Fatal("空标题应报错")
+		}
+	})
+
+	t.Run("超长标题被拒绝", func(t *testing.T) {
+		long := strings.Repeat("字", maxTitleLen+1)
+		if _, _, err := Apply(snapshot(), []Op{{Op: OpSetTableTitle, Title: long}}); err == nil {
+			t.Fatal("超长标题应报错")
+		}
+	})
+
+	t.Run("与当前标题相同则拒绝", func(t *testing.T) {
+		if _, _, err := Apply(snapshot(), []Op{{Op: OpSetTableTitle, Title: "示例手机 A1"}}); err == nil {
+			t.Fatal("标题未变化应报错，避免产生空变更")
+		}
+	})
+}
+
+func TestSetTableDescription(t *testing.T) {
+	t.Run("设置描述", func(t *testing.T) {
+		base := snapshot()
+		desc := "这是示例手机的参数表"
+		next, changes, err := Apply(base, []Op{{Op: OpSetTableDescription, Description: &desc}})
+		if err != nil {
+			t.Fatalf("不应报错: %v", err)
+		}
+		if next.Description != desc {
+			t.Fatalf("描述未写入，实际 %q", next.Description)
+		}
+		if len(changes) != 1 || changes[0].NewValue != desc || changes[0].OldValue != "" {
+			t.Fatalf("变更前后值不对: %+v", changes)
+		}
+	})
+
+	t.Run("传空字符串表示清空", func(t *testing.T) {
+		base := snapshot()
+		base.Description = "要被清空的描述"
+		empty := ""
+		next, changes, err := Apply(base, []Op{{Op: OpSetTableDescription, Description: &empty}})
+		if err != nil {
+			t.Fatalf("不应报错: %v", err)
+		}
+		if next.Description != "" {
+			t.Fatalf("描述应被清空，实际 %q", next.Description)
+		}
+		if changes[0].OldValue != "要被清空的描述" || changes[0].NewValue != "" {
+			t.Fatalf("清空的变更前后值不对: %+v", changes[0])
+		}
+	})
+
+	t.Run("缺少 description 字段被拒绝", func(t *testing.T) {
+		if _, _, err := Apply(snapshot(), []Op{{Op: OpSetTableDescription}}); err == nil {
+			t.Fatal("缺少 description 应报错")
+		}
+	})
+}
+
+// 表级 op 与参数 op 混在一批时应都能生效（校验层面）。
+func TestTableOpsMixedWithItemOps(t *testing.T) {
+	desc := "混批描述"
+	next, changes, err := Apply(snapshot(), []Op{
+		{Op: OpSetTableTitle, Title: "新名字"},
+		{Op: OpAddItem, Item: &Draft{Name: "新增项", Value: "1", ValueType: TypeNumber}},
+		{Op: OpSetTableDescription, Description: &desc},
+	})
+	if err != nil {
+		t.Fatalf("不应报错: %v", err)
+	}
+	if next.Title != "新名字" || next.Description != desc {
+		t.Fatalf("表级字段未生效: title=%q desc=%q", next.Title, next.Description)
+	}
+	if len(next.Items) != len(snapshot().Items)+1 {
+		t.Fatalf("参数项未新增，实际 %d 项", len(next.Items))
+	}
+	if len(changes) != 3 {
+		t.Fatalf("应有 3 条变更，实际 %d: %+v", len(changes), changes)
+	}
+}
+
+func TestIsTableOp(t *testing.T) {
+	for _, op := range []string{OpSetTableTitle, OpSetTableDescription} {
+		if !IsTableOp(op) {
+			t.Errorf("%s 应判定为表级操作", op)
+		}
+	}
+	for _, op := range []string{OpAddItem, OpUpdateItem, OpSetGroup, OpReorderItems} {
+		if IsTableOp(op) {
+			t.Errorf("%s 不应判定为表级操作", op)
+		}
+	}
+}

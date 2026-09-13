@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/jianboolee/d-specs/internal/ai/agent"
@@ -114,8 +115,9 @@ func (s *Service) Stream(ctx context.Context, userID, tableID string, req SendRe
 	// agent 的 emit 回调没有返回值，客户端断开的信号先记下来，Run 结束后统一处理
 	var emitErr error
 	res, runErr := ag.Run(ctx, history, ops.Snapshot{
-		Title: detail.Table.Title,
-		Items: detail.Items,
+		Title:       detail.Table.Title,
+		Description: detail.Table.Description,
+		Items:       detail.Items,
 	}, func(ev agent.Event) {
 		if emitErr != nil {
 			return
@@ -184,6 +186,10 @@ func (s *Service) Stream(ctx context.Context, userID, tableID string, req SendRe
 //
 // 这里是「校验 → 落库 → 审计」的汇合点：ops 仍然走 spec 模块的统一执行器，
 // 所以 AI 变更与手工变更共享同一套校验、乐观锁与版本快照。
+//
+// 参数项 op 与表级元信息 op 分开落库：前者走版本化的 Apply（产生 revision、
+// 可撤销），后者走 UpdateMeta（不产生 revision、不可撤销）。只有参数项改动
+// 才会推进版本号。
 func (s *Service) applyOps(
 	ctx context.Context,
 	userID, tableID, sessionID string,
@@ -195,11 +201,11 @@ func (s *Service) applyOps(
 		return ops.Snapshot{}, nil, 0, err
 	}
 
-	res, applyErr := s.specSvc.Apply(ctx, userID, tableID, spec.ApplyRequest{
-		Source:  spec.SourceAI,
-		Summary: summary,
-		Ops:     operations,
-	})
+	itemOps, tableOps := splitTableOps(operations)
+
+	// 表级改动不在版本历史里，撤销无意义；若这批同时含参数改动，
+	// 只对参数部分给出「可撤销」的信号（表级变更本身无法回退）。
+	revision, changes, applyErr := s.applySplitOps(ctx, userID, tableID, itemOps, tableOps, summary)
 	if applyErr != nil {
 		status := StatusFailed
 		if errors.Is(applyErr, spec.ErrOpsRejected) {
@@ -217,11 +223,11 @@ func (s *Service) applyOps(
 		return ops.Snapshot{}, nil, 0, applyErr
 	}
 
-	revision := res.Revision
+	rev := revision
 	_ = s.repo.SaveAIOperation(ctx, &AIOperation{
 		TableID:   tableID,
 		SessionID: sessionID,
-		Revision:  &revision,
+		Revision:  &rev,
 		Ops:       opsJSON,
 		Summary:   summary,
 		Status:    StatusApplied,
@@ -233,7 +239,98 @@ func (s *Service) applyOps(
 		return ops.Snapshot{}, nil, revision, err
 	}
 
-	return ops.Snapshot{Title: detail.Table.Title, Items: detail.Items}, res.Changes, revision, nil
+	return ops.Snapshot{
+		Title:       detail.Table.Title,
+		Description: detail.Table.Description,
+		Items:       detail.Items,
+	}, changes, revision, nil
+}
+
+// applySplitOps 先应用参数项 op（版本化），再应用表级 op（元信息）。
+//
+// 顺序有讲究：先落参数再改元信息，这样即便元信息失败，参数改动也已生效，
+// 不会出现「表名改了但参数没改」这种半截状态。
+func (s *Service) applySplitOps(
+	ctx context.Context,
+	userID, tableID string,
+	itemOps, tableOps []ops.Op,
+	summary string,
+) (int, []ops.Change, error) {
+	// 变更前后值取自进入时的真实状态，供前端展示
+	before, err := s.specSvc.Detail(ctx, userID, tableID)
+	if err != nil {
+		return 0, nil, err
+	}
+	revision := before.Table.CurrentRevision
+
+	var changes []ops.Change
+
+	if len(itemOps) > 0 {
+		res, err := s.specSvc.Apply(ctx, userID, tableID, spec.ApplyRequest{
+			Source:  spec.SourceAI,
+			Summary: summary,
+			Ops:     itemOps,
+		})
+		if err != nil {
+			return 0, nil, err
+		}
+		revision = res.Revision
+		changes = append(changes, res.Changes...)
+	}
+
+	if len(tableOps) > 0 {
+		tableChanges, err := s.applyTableOps(ctx, userID, tableID, before.Table, tableOps)
+		if err != nil {
+			return 0, nil, fmt.Errorf("%w：%s", spec.ErrOpsRejected, err.Error())
+		}
+		changes = append(changes, tableChanges...)
+	}
+
+	return revision, changes, nil
+}
+
+// applyTableOps 应用表级元信息 op（标题/描述）。
+//
+// 复用 ops.Apply 做校验与变更预览：传一份最小快照即可，只取其中的表级变更。
+func (s *Service) applyTableOps(
+	ctx context.Context,
+	userID, tableID string,
+	table spec.TableDetail,
+	tableOps []ops.Op,
+) ([]ops.Change, error) {
+	base := ops.Snapshot{Title: table.Title, Description: table.Description}
+	_, changes, err := ops.Apply(base, tableOps)
+	if err != nil {
+		return nil, err
+	}
+
+	patch := spec.UpdateRequest{}
+	for _, c := range changes {
+		text := c.NewValue
+		switch c.Name {
+		case "表标题":
+			patch.Title = &text
+		case "表描述":
+			patch.Description = &text
+		}
+	}
+
+	if _, err := s.specSvc.UpdateMeta(ctx, userID, tableID, patch); err != nil {
+		return nil, err
+	}
+	return changes, nil
+}
+
+// splitTableOps 按「是否为表级元信息操作」拆分，保持原有先后顺序。
+func splitTableOps(operations []ops.Op) (itemOps, tableOps []ops.Op) {
+	for _, op := range operations {
+		if ops.IsTableOp(op.Op) {
+			tableOps = append(tableOps, op)
+			continue
+		}
+		itemOps = append(itemOps, op)
+	}
+	return itemOps, tableOps
 }
 
 // buildHistory 只回放 user / assistant 的文本，不回放 tool 回合。
@@ -323,6 +420,11 @@ func toChangeViews(changes []ops.Change) []ChangeView {
 		}
 		if c.After != nil {
 			v.After = formatItemValue(*c.After)
+		}
+		// 表级变更（标题/描述）不走 Item 前后值，用 OldValue/NewValue 承载
+		if c.Kind == ops.ChangeTable {
+			v.Before = c.OldValue
+			v.After = c.NewValue
 		}
 		out = append(out, v)
 	}

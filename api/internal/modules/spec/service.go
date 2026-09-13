@@ -120,6 +120,13 @@ func (s *Service) Apply(ctx context.Context, userID, tableID string, req ApplyRe
 	if len(req.Ops) == 0 {
 		return nil, ErrNothingToApply
 	}
+	// 表级元信息（标题/描述）不写版本快照，走 /apply 会被静默丢弃。
+	// 与其假装成功，不如明确拒绝，让调用方改用元信息接口。
+	for _, op := range req.Ops {
+		if ops.IsTableOp(op.Op) {
+			return nil, fmt.Errorf("%w：%s 属于表级改动，不能通过变更接口应用，请使用表元信息接口", ErrOpsRejected, op.Op)
+		}
+	}
 
 	table, items, err := s.repo.GetTableWithItems(ctx, userID, tableID)
 	if err != nil {
@@ -131,7 +138,11 @@ func (s *Service) Apply(ctx context.Context, userID, tableID string, req ApplyRe
 		return nil, ErrRevisionConflict
 	}
 
-	next, changes, applyErr := ops.Apply(ops.Snapshot{Title: table.Title, Items: items}, req.Ops)
+	next, changes, applyErr := ops.Apply(ops.Snapshot{
+		Title:       table.Title,
+		Description: table.Description,
+		Items:       items,
+	}, req.Ops)
 	if applyErr != nil {
 		return nil, fmt.Errorf("%w：%s", ErrOpsRejected, applyErr.Error())
 	}
@@ -189,7 +200,7 @@ func (s *Service) Restore(ctx context.Context, userID, tableID string, revision 
 		UserID:       userID,
 		TableID:      tableID,
 		BaseRevision: table.CurrentRevision,
-		Next:         ops.Snapshot{Title: table.Title, Items: target},
+		Next:         ops.Snapshot{Title: table.Title, Description: table.Description, Items: target},
 		Source:       SourceRestore,
 		Summary:      fmt.Sprintf("恢复到版本 r%d", revision),
 	})

@@ -95,6 +95,16 @@ function hasChanges(msg: ChatMessage) {
   return (msg.changes?.length ?? 0) > 0
 }
 
+/**
+ * 是否包含表级改动（标题/描述）。
+ *
+ * 这类改动走元信息路径、不产生版本，撤销按钮回退不了它们，
+ * 所以含表级改动时不给「撤销」，并在卡片上说明。
+ */
+function hasTableChange(msg: ChatMessage) {
+  return (msg.changes ?? []).some((c) => c.kind === 'table')
+}
+
 function kindLabel(kind: ChatChange['kind']) {
   switch (kind) {
     case 'add':
@@ -103,6 +113,8 @@ function kindLabel(kind: ChatChange['kind']) {
       return '修改'
     case 'delete':
       return '删除'
+    case 'table':
+      return '表'
     default:
       return '移动'
   }
@@ -147,8 +159,9 @@ function kindLabel(kind: ChatChange['kind']) {
                 已修改 {{ msg.changes!.length }} 处
                 <template v-if="msg.appliedRevision">· r{{ msg.appliedRevision }}</template>
               </span>
+              <!-- 表级改动不产生版本，撤销回退不了，因此不提供撤销按钮 -->
               <button
-                v-if="!msg.undone && !msg.restored"
+                v-if="!msg.undone && !msg.restored && !hasTableChange(msg)"
                 type="button"
                 class="undo"
                 @click="emit('undo', msg.id)"
@@ -162,7 +175,7 @@ function kindLabel(kind: ChatChange['kind']) {
               <li v-for="(c, i) in msg.changes" :key="`${c.item_id}-${i}`">
                 <span class="change-kind" :class="c.kind">{{ kindLabel(c.kind) }}</span>
                 <span class="change-name">{{ c.name }}</span>
-                <template v-if="c.kind === 'update'">
+                <template v-if="c.kind === 'update' || c.kind === 'table'">
                   <span class="change-from">{{ c.before || '—' }}</span>
                   <i class="ri-arrow-right-line" />
                   <span class="change-to">{{ c.after || '—' }}</span>
@@ -175,6 +188,10 @@ function kindLabel(kind: ChatChange['kind']) {
                 </template>
               </li>
             </ul>
+
+            <p v-if="hasTableChange(msg) && !msg.undone" class="changes-note">
+              表信息（标题/描述）不进入版本历史，无法在这里撤销
+            </p>
           </div>
 
           <div v-if="msg.pending" class="pending">
@@ -500,6 +517,18 @@ function kindLabel(kind: ChatChange['kind']) {
 .change-kind.update {
   background: var(--ds-primary-soft);
   color: var(--ds-primary);
+}
+
+.change-kind.table {
+  background: rgba(245, 166, 35, 0.14);
+  color: #b8830a;
+}
+
+/* 表级改动不可撤销的说明 */
+.changes-note {
+  margin: 8px 0 0;
+  font-size: var(--ds-font-xs);
+  color: var(--ds-text-tertiary);
 }
 
 .change-name {

@@ -153,7 +153,7 @@ export interface Op {
   group_name?: string
 }
 
-export type ChangeKind = 'add' | 'update' | 'delete' | 'move'
+export type ChangeKind = 'add' | 'update' | 'delete' | 'move' | 'table'
 
 /** 单条变更，用于表格高亮 */
 export interface Change {

@@ -250,8 +250,18 @@ export const useChatStore = defineStore('chat', () => {
     const spec = useSpecTableStore()
     try {
       await spec.refreshItems()
-      spec.noteExternalChange(revisionBefore)
-      spec.flash(changes.map((c) => c.item_id))
+      const hasTableChange = changes.some((c) => c.kind === 'table')
+      // 只有参数项改动才会推进版本号。表级改动（标题/描述）不产生版本，
+      // 这里压栈会留下一个「撤销到同一版本」的空操作，因此跳过。
+      if (changes.some((c) => c.kind !== 'table')) {
+        spec.noteExternalChange(revisionBefore)
+      }
+      // 表级改动改了标题，侧栏列表用的是另一份数据（spec.tables），
+      // 不刷新的话侧栏仍显示旧表名。
+      if (hasTableChange) void spec.loadTables()
+      // 表级变更是元信息，没有可高亮的参数项（item_id 为空）
+      const itemIds = changes.map((c) => c.item_id).filter(Boolean)
+      if (itemIds.length > 0) spec.flash(itemIds)
     } catch {
       // 画布刷新失败不影响对话本身，用户手动刷新即可
     }
