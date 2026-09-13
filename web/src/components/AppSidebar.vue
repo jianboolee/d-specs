@@ -119,9 +119,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <!-- 手机上抽屉打开时的背景遮罩：点击关闭。加 isMobile 守卫，避免抽屉开着时
-       把窗口拉宽到桌面，遮罩残留下来盖住整个桌面布局 -->
-  <div v-if="sidebarOpen && isMobile" class="sidebar-backdrop" @click="closeSidebar" />
+  <!-- 手机端抽屉的遮罩。始终保留在 DOM 里、用 opacity/visibility 切换，
+       刻意不用 v-if 移除：iOS Safari 上移除 position:fixed 元素偶尔会残留合成层，
+       表现为关闭后仍盖着一层半透明蒙层（安卓无此问题）。 -->
+  <div class="sidebar-backdrop" :class="{ 'is-visible': sidebarOpen }" @click="closeSidebar" />
 
   <!-- 手机上收纳侧栏后的入口：固定左上角，三个带侧栏的页面共用 -->
   <button v-if="isMobile && !sidebarOpen" class="hamburger" type="button" aria-label="打开侧栏" @click="openSidebar">
@@ -545,15 +546,30 @@ onMounted(() => {
   color: var(--ds-text);
 }
 
-/* 遮罩默认不存在，只在手机上打开抽屉时由模板渲染 */
+/* 遮罩默认不参与渲染（桌面端整个关掉），手机上用 opacity/visibility 切换 */
 .sidebar-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(0, 0, 0, 0.4);
+  display: none;
 }
 
 @media (max-width: 768px) {
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 0.22s ease,
+      visibility 0.22s ease;
+  }
+
+  .sidebar-backdrop.is-visible {
+    opacity: 1;
+    visibility: visible;
+  }
+
   .sidebar {
     position: fixed;
     top: 0;
@@ -563,11 +579,17 @@ onMounted(() => {
     width: min(82vw, 300px);
     /* 抽屉收在屏幕外，打开时滑入 */
     transform: translateX(-100%);
-    transition: transform 0.22s ease;
+    /* 关闭态一并置 visibility:hidden：只靠 translate 移出屏幕，iOS Safari 有时
+       仍保留这层不重绘，于是关掉后还留着一块底色 */
+    visibility: hidden;
+    transition:
+      transform 0.22s ease,
+      visibility 0.22s ease;
   }
 
   .sidebar.mobile-open {
     transform: translateX(0);
+    visibility: visible;
   }
 
   /* 手机上用抽屉＋遮罩，桌面那套「收起成图标」的按钮不再需要 */

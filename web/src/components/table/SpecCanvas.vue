@@ -133,9 +133,10 @@ function isHighlighted(id: string) {
 </script>
 
 <template>
-  <!-- 手机端画布是右侧滑入的抽屉：左侧留出的空隙盖一层遮罩，点击即关闭，
-       避免这截空隙里的点击穿透到后面的对话上。显隐由媒体查询控制（见样式） -->
-  <div v-if="canvasOpen" class="canvas-backdrop" @click="closeCanvas" />
+  <!-- 手机端画布是右侧滑入的抽屉：左侧留出的空隙盖一层遮罩，点击即关闭。
+       遮罩始终留在 DOM 里、用 opacity/visibility 切换，不用 v-if 移除 ——
+       iOS Safari 上移除 position:fixed 元素偶尔会残留合成层（见样式注释）。 -->
+  <div class="canvas-backdrop" :class="{ 'is-visible': canvasOpen }" @click="closeCanvas" />
 
   <!-- 收起后宽度为 0，inert 让内部按钮一并退出键盘焦点顺序 -->
   <section
@@ -739,6 +740,16 @@ function isHighlighted(id: string) {
     inset: 0;
     z-index: 41;
     background: rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 0.22s ease,
+      visibility 0.22s ease;
+  }
+
+  .canvas-backdrop.is-visible {
+    opacity: 1;
+    visibility: visible;
   }
 
   .canvas {
@@ -761,11 +772,17 @@ function isHighlighted(id: string) {
     border-left: none;
     /* left 有偏移，且宽度 = 视口 − 偏移，所以 translateX(100%) 恰好把它推到屏幕外 */
     transform: translateX(100%);
-    transition: transform 0.22s ease;
+    /* 关闭态一并置 visibility:hidden：只靠 translate 移出屏幕，iOS Safari 有时
+       仍保留这层不重绘，关掉后右侧还留着一条半透明底板 */
+    visibility: hidden;
+    transition:
+      transform 0.22s ease,
+      visibility 0.22s ease;
   }
 
   .canvas.mobile-open {
     transform: translateX(0);
+    visibility: visible;
   }
 
   /* 手机上画布铺满右侧，内边距也收一点 */
