@@ -322,9 +322,11 @@ function isHighlighted(id: string) {
 
 <style scoped>
 .canvas {
-  /* 画布固定宽度：多余空间全部留给左侧对话栏，浏览器宽度变化时只影响聊天区 */
-  flex: none;
-  width: 460px;
+  /* 宽度自适应，不写死像素：按工作区宽度取一份比例，再夹在可读区间内。
+     可伸可缩——窗口变宽时跟着变宽，变窄时收缩到还能放下表格的尺寸；
+     对话区的 min-width 在这之前兜住下限（见 WorkspaceView 的 .chat-col）。 */
+  flex: 0 1 auto;
+  width: clamp(200px, 38%, 620px);
   min-width: 0;
   min-height: 0;
   display: flex;
@@ -333,6 +335,24 @@ function isHighlighted(id: string) {
   background: var(--ds-surface);
   border-left: 1px solid var(--ds-border);
   transition: width 0.2s ease;
+}
+
+/* 画布被压窄时版本号先让位。操作按钮是 flex:none，必须保证撤销/重做/分享/收起
+   始终可见可点——否则收起按钮被挤出可视区，用户就没法把画布收起来了。 */
+.revision,
+.saving {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 窄画布时收紧头部间距，把空间让给按钮 */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .canvas-head {
+    padding: 0 10px;
+    gap: 8px;
+  }
 }
 
 /* 收起：宽度归零让位给对话区，边框一并去掉避免残留 1px 竖线 */

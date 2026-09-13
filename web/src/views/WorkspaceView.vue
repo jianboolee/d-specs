@@ -689,6 +689,16 @@ async function handleUndoMessage(messageId: string) {
   overflow: hidden;
 }
 
+/* ==================== 桌面：对话区不得被压到 0 ==================== */
+
+@media (min-width: 769px) {
+  /* 画布宽度自适应（见 SpecCanvas），窄下来时不要再把对话区一起拖到 0。
+     给对话区一条底线，画布会先收缩让出空间。 */
+  .chat-col {
+    min-width: 340px;
+  }
+}
+
 .chat-head {
   flex: none;
   display: flex;
