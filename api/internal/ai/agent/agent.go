@@ -148,11 +148,17 @@ func (a *Agent) Run(
 		if len(calls) == 0 {
 			res.Reply = strings.TrimSpace(resp.Message.Content)
 			res.Snapshot = registry.Snapshot()
-			// 推理模型的思考与正文共享 max_tokens 预算，预算太小时正文会为空。
-			// 必须显式告知，否则前端只会显示一条空白回复。
+			// 推理模型的思考与正文共享 max_tokens 预算：思考太长时正文会为空。
+			// 先追问一次，要求直接给结论、收着点思考；仍然为空才给出面向用户的提示。
 			if res.Reply == "" && resp.FinishReason == "length" {
-				res.Truncated = true
-				res.Reply = "模型输出被截断，未产生正文。请调大 AI_MAX_TOKENS 后重试。"
+				reply, retryUsage := a.retryDirectAnswer(ctx, messages)
+				res.Usage = res.Usage.Add(retryUsage)
+				if reply != "" {
+					res.Reply = reply
+				} else {
+					res.Truncated = true
+					res.Reply = "AI 这次思考得太久，没来得及给出回答。请再试一次，或把问题拆得小一点。"
+				}
 			}
 			return res, nil
 		}
@@ -303,6 +309,37 @@ func (a *Agent) handleProposeOps(
 		"changes": appliedChanges,
 		"hint":    "变更已生效。请用中文简要说明改了什么，不要重复列出全部数据",
 	}, nil
+}
+
+// brevityInstruction 正文为空、预算被思考吃光时的追问。
+//
+// 刻意强调「不要展开思考」：模型上一轮正是把预算全花在 reasoning 上，
+// 不明确收着点，重试很可能再次得到空正文。
+const brevityInstruction = "请直接用中文给出最终回答，不要展开思考过程，也不要复述数据，尽量简短。"
+
+// retryDirectAnswer 在正文被思考挤空后追问一次，只求一段结论性正文。
+//
+// 不再带工具定义：进入这个分支时工具调用已经结束，模型只需要把结论写出来。
+// 追问失败（网络错误等）时不向上抛错 —— 此时真正的问题是「没拿到正文」，
+// 交给调用方按截断处理，比因为一次补救请求失败而丢掉整轮结果更好。
+func (a *Agent) retryDirectAnswer(ctx context.Context, messages []provider.Message) (string, provider.Usage) {
+	// 复制一份再追加，避免污染外层正在累积的消息序列
+	retryMessages := make([]provider.Message, 0, len(messages)+1)
+	retryMessages = append(retryMessages, messages...)
+	retryMessages = append(retryMessages, provider.Message{
+		Role:    provider.RoleUser,
+		Content: brevityInstruction,
+	})
+
+	resp, err := a.llm.Chat(ctx, provider.ChatRequest{
+		Messages:    retryMessages,
+		Temperature: a.cfg.Temperature,
+		MaxTokens:   a.cfg.MaxTokens,
+	})
+	if err != nil {
+		return "", provider.Usage{}
+	}
+	return strings.TrimSpace(resp.Message.Content), resp.Usage
 }
 
 // rejected 构造回灌给模型的校验失败结果
