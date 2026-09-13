@@ -43,6 +43,7 @@ type PublicSpec struct {
 	Title       string        `json:"title"`
 	Description string        `json:"description"`
 	Industry    string        `json:"industry"`
+	Tags        []string      `json:"tags"`
 	UpdatedAt   time.Time     `json:"updated_at"`
 	Groups      []PublicGroup `json:"groups"`
 }

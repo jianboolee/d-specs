@@ -56,7 +56,7 @@ func (r *Repository) ListTables(ctx context.Context, userID, keyword string, off
 	// 参数项数量用相关子查询一次带出，避免 N+1
 	var rows []TableSummary
 	err := query.
-		Select("id, title, description, industry, visibility, current_revision, created_at, updated_at, " +
+		Select("id, title, description, industry, tags, visibility, current_revision, created_at, updated_at, " +
 			"(SELECT COUNT(*) FROM spec_items WHERE spec_items.table_id = spec_tables.id) AS item_count").
 		Order("updated_at DESC").Offset(offset).Limit(limit).
 		Scan(&rows).Error
@@ -135,9 +135,33 @@ type TablePatch struct {
 	Title       *string
 	Description *string
 	Industry    *string
+	Tags        *[]string
 }
 
-// UpdateTableMeta 修改表标题/描述/行业。
+// normalizeTags 去掉空白项、去重并保留顺序，最多 8 个。
+//
+// 落库前统一处理，避免 AI 或接口传进来的脏数据（空串、重复）进库。
+func normalizeTags(raw []string) []string {
+	out := make([]string, 0, len(raw))
+	seen := make(map[string]struct{}, len(raw))
+	for _, t := range raw {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		out = append(out, t)
+		if len(out) == 8 {
+			break
+		}
+	}
+	return out
+}
+
+// UpdateTableMeta 修改表标题/描述/行业/标签。
 //
 // 这类元信息变更不产生 revision —— 版本用于参数内容的撤销，
 // 把改标题也塞进去会让撤销语义变混乱。
@@ -155,6 +179,15 @@ func (r *Repository) UpdateTableMeta(ctx context.Context, userID, tableID string
 	}
 	if patch.Industry != nil {
 		updates["industry"] = strings.TrimSpace(*patch.Industry)
+	}
+	if patch.Tags != nil {
+		// 走 map 更新不会触发 BeforeSave，序列化 serializer:json 也未必生效，
+		// 这里显式序列化并加 ::jsonb 转型，避免「text 赋给 jsonb」的类型错误
+		raw, err := json.Marshal(normalizeTags(*patch.Tags))
+		if err != nil {
+			return nil, err
+		}
+		updates["tags"] = gorm.Expr("?::jsonb", string(raw))
 	}
 	if len(updates) == 0 {
 		return r.GetTable(ctx, userID, tableID)

@@ -47,6 +47,8 @@ export interface TableDetail {
   title: string
   description: string
   industry: string
+  /** 产品类型标签，由 AI 分析写入 */
+  tags: string[]
   visibility: 'private' | 'link'
   current_revision: number
   created_at: string
@@ -59,6 +61,8 @@ export interface TableSummary {
   title: string
   description: string
   industry: string
+  /** 产品类型标签，由 AI 分析写入 */
+  tags: string[]
   visibility: 'private' | 'link'
   current_revision: number
   item_count: number
@@ -242,6 +246,7 @@ export interface PublicSpec {
   title: string
   description: string
   industry: string
+  tags: string[]
   updated_at: string
   groups: PublicGroup[]
 }
@@ -256,4 +261,19 @@ export interface PublicItem {
   value: string
   value_type: SpecValueType
   remark?: string
+}
+
+// ==================== AI 分析 ====================
+
+/** 一条「建议补充的参数」 */
+export interface AnalyzeSuggestion {
+  name: string
+  reason: string
+}
+
+/** 一次 AI 分析的结果：标签已由服务端落库，建议仅用于展示 */
+export interface AnalyzeResult {
+  product_type: string
+  tags: string[]
+  suggestions: AnalyzeSuggestion[]
 }

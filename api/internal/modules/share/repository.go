@@ -162,6 +162,7 @@ type publicRow struct {
 	Title       string    `gorm:"column:title"`
 	Description string    `gorm:"column:description"`
 	Industry    string    `gorm:"column:industry"`
+	Tags        []string  `gorm:"column:tags;serializer:json"`
 	UpdatedAt   time.Time `gorm:"column:updated_at"`
 }
 
@@ -169,7 +170,7 @@ func (r *Repository) loadPublicTable(ctx context.Context, tableID string) (*publ
 	var row publicRow
 	err := r.db.WithContext(ctx).
 		Table("spec_tables").
-		Select("title, description, industry, updated_at").
+		Select("title, description, industry, tags, updated_at").
 		Where("id = ? AND deleted_at IS NULL", tableID).
 		Take(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

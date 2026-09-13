@@ -17,9 +17,10 @@ type CreateRequest struct {
 }
 
 type UpdateRequest struct {
-	Title       *string `json:"title" binding:"omitempty,max=120"`
-	Description *string `json:"description" binding:"omitempty,max=2000"`
-	Industry    *string `json:"industry" binding:"omitempty,max=64"`
+	Title       *string   `json:"title" binding:"omitempty,max=120"`
+	Description *string   `json:"description" binding:"omitempty,max=2000"`
+	Industry    *string   `json:"industry" binding:"omitempty,max=64"`
+	Tags        *[]string `json:"tags" binding:"omitempty,max=8,dive,max=24"`
 }
 
 type DuplicateRequest struct {
@@ -48,6 +49,7 @@ type TableSummary struct {
 	Title           string    `gorm:"column:title" json:"title"`
 	Description     string    `gorm:"column:description" json:"description"`
 	Industry        string    `gorm:"column:industry" json:"industry"`
+	Tags            []string  `gorm:"column:tags;serializer:json" json:"tags"`
 	Visibility      string    `gorm:"column:visibility" json:"visibility"`
 	CurrentRevision int       `gorm:"column:current_revision" json:"current_revision"`
 	ItemCount       int       `gorm:"column:item_count" json:"item_count"`
@@ -68,6 +70,7 @@ type TableDetail struct {
 	Title           string    `json:"title"`
 	Description     string    `json:"description"`
 	Industry        string    `json:"industry"`
+	Tags            []string  `json:"tags"`
 	Visibility      string    `json:"visibility"`
 	CurrentRevision int       `json:"current_revision"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -75,11 +78,16 @@ type TableDetail struct {
 }
 
 func toTableDetail(t *SpecTable) TableDetail {
+	tags := t.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	return TableDetail{
 		ID:              t.ID,
 		Title:           t.Title,
 		Description:     t.Description,
 		Industry:        t.Industry,
+		Tags:            tags,
 		Visibility:      t.Visibility,
 		CurrentRevision: t.CurrentRevision,
 		CreatedAt:       t.CreatedAt,

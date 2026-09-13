@@ -1,0 +1,1 @@
+ALTER TABLE spec_tables DROP COLUMN IF EXISTS tags;

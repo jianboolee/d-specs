@@ -100,6 +100,7 @@ func (s *Service) PublicSpec(ctx context.Context, tableID string) (*PublicSpec, 
 		Title:       table.Title,
 		Description: table.Description,
 		Industry:    table.Industry,
+		Tags:        table.Tags,
 		UpdatedAt:   table.UpdatedAt,
 		Groups:      groupRows(rows),
 	}, nil

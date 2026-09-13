@@ -90,6 +90,7 @@ function readSeed(): PublicSpec | null {
           <p v-if="spec.description" class="spec-desc">{{ spec.description }}</p>
           <div class="spec-meta">
             <span v-if="spec.industry" class="tag">{{ spec.industry }}</span>
+            <span v-for="t in spec.tags" :key="t" class="tag">{{ t }}</span>
             <span>{{ totalItems }} 个参数</span>
             <template v-if="updatedAt">
               <span class="dot">·</span>

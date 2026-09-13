@@ -93,6 +93,19 @@ export const useSpecTableStore = defineStore('specTable', () => {
     return updated
   }
 
+  /**
+   * AI 分析当前表：识别产品类型、自动打标签，并返回补充建议。
+   *
+   * 标签由服务端落库，这里把返回结果同步进当前表，避免再拉一次详情。
+   */
+  async function analyzeTable() {
+    if (!table.value) throw new ApiError('没有打开的参数表', -1, 0)
+    const res = await api.analyzeTable(table.value.id)
+    table.value = { ...table.value, tags: res.tags }
+    await loadTables()
+    return res
+  }
+
   // ---------- 当前表 ----------
 
   async function openTable(id: string) {
@@ -258,6 +271,7 @@ export const useSpecTableStore = defineStore('specTable', () => {
     removeTable,
     duplicateTable,
     renameTable,
+    analyzeTable,
 
     // 当前表
     table,

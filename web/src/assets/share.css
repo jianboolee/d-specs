@@ -74,6 +74,7 @@
 .share-page .spec-meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 7px;
   font-size: var(--ds-font-xs);
   color: var(--ds-text-tertiary);
@@ -84,6 +85,7 @@
   border-radius: 20px;
   background: var(--ds-primary-soft);
   color: var(--ds-primary);
+  white-space: nowrap;
 }
 
 .share-page .dot {

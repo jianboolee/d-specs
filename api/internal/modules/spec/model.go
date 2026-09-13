@@ -5,6 +5,8 @@ import (
 
 	"github.com/jianboolee/d-specs/internal/ai/ops"
 	"github.com/jianboolee/d-specs/pkg/quantity"
+
+	"gorm.io/gorm"
 )
 
 // SpecTable 参数表。一张表 = 一个产品的参数配置表。
@@ -14,7 +16,9 @@ type SpecTable struct {
 	Title       string `gorm:"column:title"`
 	Description string `gorm:"column:description"`
 	Industry    string `gorm:"column:industry"`
-	Visibility  string `gorm:"column:visibility"`
+	// Tags 产品类型标签，由 AI 分析写入；JSONB 数组，nil 会在落库前归一到 []
+	Tags       []string `gorm:"column:tags;serializer:json"`
+	Visibility string   `gorm:"column:visibility"`
 	// CurrentRevision 乐观锁 + 版本号；写操作必须带上期望值比对
 	CurrentRevision int        `gorm:"column:current_revision"`
 	CreatedAt       time.Time  `gorm:"column:created_at"`
@@ -23,6 +27,17 @@ type SpecTable struct {
 }
 
 func (SpecTable) TableName() string { return "spec_tables" }
+
+// BeforeSave 把 nil 标签归一到空数组。
+//
+// serializer:json 会把 nil 切片序列化成 JSON 的 null，写进 NOT NULL 的 JSONB
+// 列虽然合法但语义含糊，统一成 [] 更干净，也免得读出来再特判。
+func (t *SpecTable) BeforeSave(*gorm.DB) error {
+	if t.Tags == nil {
+		t.Tags = []string{}
+	}
+	return nil
+}
 
 // SpecItem 参数项。表内每行 = 一条参数。
 type SpecItem struct {
