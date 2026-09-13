@@ -213,6 +213,16 @@ export interface ChatEvent {
   message_id?: string
   reply?: string
   usage?: ChatUsage
+  /** 随 done 事件下发的建议动作；不落库，仅当前轮次可见 */
+  actions?: ChatAction[]
+}
+
+/** 一条建议动作：点击后把 message 当作一条用户消息直接发送 */
+export interface ChatAction {
+  /** 按钮上的短文案，例如「带上年款」 */
+  label: string
+  /** 点击后发送的完整指令 */
+  message: string
 }
 
 export interface ChatSession {
@@ -261,19 +271,4 @@ export interface PublicItem {
   value: string
   value_type: SpecValueType
   remark?: string
-}
-
-// ==================== AI 分析 ====================
-
-/** 一条「建议补充的参数」 */
-export interface AnalyzeSuggestion {
-  name: string
-  reason: string
-}
-
-/** 一次 AI 分析的结果：标签已由服务端落库，建议仅用于展示 */
-export interface AnalyzeResult {
-  product_type: string
-  tags: string[]
-  suggestions: AnalyzeSuggestion[]
 }

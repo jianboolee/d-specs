@@ -4,12 +4,32 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jianboolee/d-specs/internal/ai/baseline"
 	"github.com/jianboolee/d-specs/internal/ai/ops"
 )
 
 // maxInlineItems 直接把参数名清单塞进 system prompt 的上限。
 // 超过这个数量就只给分组概览，让模型自己去查 —— 否则大表会白白吃掉上下文。
 const maxInlineItems = 150
+
+// baselineStatus 渲染基础参数的存在情况，例如「品牌（缺失）、型号（已有）」。
+func baselineStatus(items []ops.Item) string {
+	names := make([]string, 0, len(items))
+	for _, it := range items {
+		names = append(names, it.Name)
+	}
+
+	presences := baseline.Check(names)
+	parts := make([]string, 0, len(presences))
+	for _, p := range presences {
+		if p.Present {
+			parts = append(parts, p.Name+"（已有）")
+			continue
+		}
+		parts = append(parts, p.Name+"（缺失）")
+	}
+	return strings.Join(parts, "、")
+}
 
 const systemPromptBase = `你是「参数配置表」的编辑助手，帮企业维护自家产品的参数表。
 
@@ -52,6 +72,18 @@ const systemPromptBase = `你是「参数配置表」的编辑助手，帮企业
 - 这类表级改动与参数改动不同：它不会产生新版本，用户无法用「撤销」回退，所以动手前
   请用一句话说明你要把标题/描述改成什么。
 
+## 基础参数（品牌、型号）
+
+每张参数表都应覆盖「品牌」与「型号」——回答「谁家的、哪一款」。
+
+- **只在用户建表、新建参数表，或要求整体整理这张表时处理基础参数。**
+  只是改某个具体值（例如「把续航改成 800km」）时不要顺手补基础参数。
+- 用户提供了值（例如「品牌是 XX」「型号 XX-100」）→ 用 add_items / update_item 写进去。
+- **用户没提供的，绝不编造，也不要新增空值占位行。** 在最终回复里用一句话说明还缺哪个，
+  让用户决定是否补充。
+- 下面「当前参数表」里会给出基础参数的当前状态，以它为准，不要重复新增已有的参数。
+- 基础参数只是底线，不是全部：用户要求补全时，仍按产品类型补齐其他关键参数。
+
 ## 回复风格
 
 - 用中文，简洁，不要复述工具返回的原始数据。
@@ -77,6 +109,11 @@ func BuildSystemPrompt(s ops.Snapshot) string {
 	} else {
 		b.WriteString("描述：（暂无）\n")
 	}
+
+	// 基础参数状态：即使空表也要给，用户常常一上来就建表，这是最需要提示的时机
+	b.WriteString("基础参数：")
+	b.WriteString(baselineStatus(s.Items))
+	b.WriteString("\n")
 
 	if len(s.Items) == 0 {
 		b.WriteString("\n这张表目前是空的。如果用户要建表，直接用 add_items 一次性建立全部参数项，\n")

@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 import * as chatApi from '@/api/chat'
 import { ApiError } from '@/api/http'
 import { useSpecTableStore } from './specTable'
-import type { ChatChange, ChatEvent, ChatSession } from '@/types/api'
+import type { ChatAction, ChatChange, ChatEvent, ChatSession } from '@/types/api'
 
 /** 界面上的一条消息 */
 export interface UiMessage {
@@ -31,6 +31,12 @@ export interface UiMessage {
    * 要回退请用画布上的撤销（它是按版本走的）。
    */
   restored?: boolean
+  /**
+   * 本轮回复的建议动作，点击即发送。
+   *
+   * 服务端不落库，刷新或切换会话后就没有了 —— 这里不需要特殊处理。
+   */
+  actions?: ChatAction[]
 }
 
 /** 工具名的中文说明，让「正在检索参数」比裸工具名好懂 */
@@ -47,6 +53,8 @@ export const useChatStore = defineStore('chat', () => {
   const sessions = ref<ChatSession[]>([])
   const sessionId = ref('')
   const sending = ref(false)
+  /** 正在跑「完善参数表」分析（用于入口按钮的 loading 态） */
+  const analyzing = ref(false)
   const loadingHistory = ref(false)
   const lastError = ref('')
 
@@ -153,6 +161,59 @@ export const useChatStore = defineStore('chat', () => {
 
     messages.value.push({ id: nextId('u'), role: 'user', text: content })
 
+    await streamInto(
+      (opts) =>
+        chatApi.streamChat(
+          spec.table!.id,
+          { sessionId: sessionId.value, message: content },
+          opts,
+        ),
+      revisionBefore,
+    )
+  }
+
+  /**
+   * 触发一轮「完善参数表」：让 AI 通读当前表，指出产品类型与还缺哪些关键参数。
+   *
+   * 不 push 用户消息 —— 这是系统发起的分析，不是用户发言。结果由服务端渲染成
+   * Markdown 作为一条 assistant 消息流式返回，标签也在服务端落库。
+   */
+  async function analyze() {
+    if (sending.value) return
+
+    const spec = useSpecTableStore()
+    if (!spec.table) {
+      lastError.value = '请先打开一张参数表'
+      return
+    }
+
+    const revisionBefore = spec.table.current_revision
+    analyzing.value = true
+    try {
+      await streamInto(
+        (opts) => chatApi.analyzeStream(spec.table!.id, { sessionId: sessionId.value }, opts),
+        revisionBefore,
+        '分析失败，请稍后重试',
+      )
+    } finally {
+      analyzing.value = false
+    }
+  }
+
+  /**
+   * 跑一轮流式助手回复：建占位消息、接线事件、收尾复位。
+   *
+   * send 与 analyze 的差别只在「发什么请求、要不要先 push 用户消息」，
+   * 其余（占位消息的响应式、错误处理、会话列表刷新）共用这一份实现。
+   */
+  async function streamInto(
+    call: (opts: {
+      signal: AbortSignal
+      onEvent: (event: ChatEvent) => void
+    }) => Promise<void>,
+    revisionBefore: number,
+    fallbackError = '对话失败，请稍后重试',
+  ) {
     /*
      * 必须用 reactive() 包一层再 push。
      *
@@ -174,18 +235,14 @@ export const useChatStore = defineStore('chat', () => {
     controller = new AbortController()
 
     try {
-      await chatApi.streamChat(
-        spec.table.id,
-        { sessionId: sessionId.value, message: content },
-        {
-          signal: controller.signal,
-          onEvent: (event) => handleEvent(event, assistant, revisionBefore),
-        },
-      )
+      await call({
+        signal: controller.signal,
+        onEvent: (event) => handleEvent(event, assistant, revisionBefore),
+      })
     } catch (err) {
       // 用户主动停止不算错误
       if (!(err instanceof DOMException && err.name === 'AbortError')) {
-        const message = err instanceof ApiError ? err.message : '对话失败，请稍后重试'
+        const message = err instanceof ApiError ? err.message : fallbackError
         assistant.error = message
         lastError.value = message
       }
@@ -236,6 +293,7 @@ export const useChatStore = defineStore('chat', () => {
         if (!assistant.text.trim()) {
           assistant.text = event.reply?.trim() || '（模型没有返回文字说明）'
         }
+        if (event.actions?.length) assistant.actions = event.actions
         break
 
       case 'error':
@@ -295,6 +353,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function reset() {
     abort()
+    analyzing.value = false
     messages.value = []
     sessions.value = []
     sessionId.value = ''
@@ -308,6 +367,7 @@ export const useChatStore = defineStore('chat', () => {
     sessionId,
     currentSession,
     sending,
+    analyzing,
     loadingHistory,
     lastError,
     canSend,
@@ -318,6 +378,7 @@ export const useChatStore = defineStore('chat', () => {
     openSession,
     newSession,
     send,
+    analyze,
     abort,
     undoMessage,
     reset,

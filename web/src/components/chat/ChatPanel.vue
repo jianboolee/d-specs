@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 
 import MarkdownText from './MarkdownText.vue'
-import type { ChatChange } from '@/types/api'
+import type { ChatAction, ChatChange } from '@/types/api'
 
 /** 与 chat store 的 UiMessage 结构一致（结构化匹配，不直接依赖 store） */
 export interface ChatMessage {
@@ -18,11 +18,15 @@ export interface ChatMessage {
   undone?: boolean
   /** 从历史记录恢复的消息（没有当时的版本号，因此不提供逐条撤销） */
   restored?: boolean
+  /** 本轮回复的建议动作，点击即发送 */
+  actions?: ChatAction[]
 }
 
 const props = defineProps<{
   messages: ChatMessage[]
   sending?: boolean
+  /** 正在跑「完善参数表」分析，用于入口按钮的 loading 态 */
+  analyzing?: boolean
   disabled?: boolean
   /** 正在拉取历史对话 */
   loading?: boolean
@@ -30,6 +34,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   send: [text: string]
+  analyze: []
   stop: []
   undo: [messageId: string]
 }>()
@@ -203,6 +208,22 @@ function kindLabel(kind: ChatChange['kind']) {
             <i class="ri-error-warning-line" />
             <span>{{ msg.error }}</span>
           </div>
+
+          <!-- 建议动作：由本轮回复内容生成，点击即当作一条用户消息发送 -->
+          <div v-if="msg.actions?.length && !msg.streaming" class="msg-actions">
+            <button
+              v-for="action in msg.actions"
+              :key="action.label"
+              type="button"
+              class="msg-action"
+              :disabled="disabled || sending"
+              :title="action.message"
+              @click="emit('send', action.message)"
+            >
+              <i class="ri-sparkling-2-line" />
+              {{ action.label }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -230,6 +251,20 @@ function kindLabel(kind: ChatChange['kind']) {
     </div>
 
     <div class="composer">
+      <!-- 常驻入口：随时可以让 AI 通读这张表、指出还缺哪些关键参数 -->
+      <div class="composer-actions">
+        <button
+          type="button"
+          class="action-chip"
+          :disabled="disabled || sending"
+          title="让 AI 通读这张表，指出还缺哪些关键参数（只给建议，不改动表格）"
+          @click="emit('analyze')"
+        >
+          <i :class="analyzing ? 'ri-loader-4-line spin' : 'ri-sparkling-2-line'" />
+          完善参数表
+        </button>
+      </div>
+
       <div class="composer-box">
         <textarea
           ref="textareaRef"
@@ -605,6 +640,67 @@ function kindLabel(kind: ChatChange['kind']) {
   padding-block: 10px 16px;
   /* 输入区与消息列同宽对齐 */
   padding-inline: max(22px, calc((100% - var(--ds-chat-max)) / 2));
+}
+
+/* 输入框上方的常驻快捷入口，与输入区左对齐 */
+.composer-actions {
+  display: flex;
+  gap: 8px;
+  margin: 0 2px 8px;
+}
+
+.action-chip,
+.msg-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.action-chip {
+  padding: 5px 12px;
+  border-radius: 16px;
+  background: var(--ds-primary-soft);
+  color: var(--ds-primary);
+  font-size: var(--ds-font-xs);
+}
+
+.action-chip:hover:not(:disabled) {
+  background: var(--ds-primary);
+  color: var(--ds-primary-foreground);
+}
+
+.action-chip:disabled,
+.msg-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 建议动作：一行可放多个，超出换行 */
+.msg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.msg-action {
+  padding: 4px 11px;
+  border: 1px solid var(--ds-border);
+  border-radius: 999px;
+  background: var(--ds-surface);
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-font-xs);
+}
+
+.msg-action:hover:not(:disabled) {
+  border-color: var(--ds-primary);
+  background: var(--ds-primary-soft);
+  color: var(--ds-primary);
 }
 
 .composer-box {

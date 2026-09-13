@@ -36,6 +36,33 @@ export function streamChat(tableId: string, input: StreamChatInput, options: Str
   )
 }
 
+/**
+ * 触发一轮「完善参数表」分析。
+ *
+ * 与聊天共用同一条 SSE 通道、同一套事件格式，区别只是请求体没有 message ——
+ * 这一轮不是用户发言，而是系统发起的分析，服务端自己读表内容。
+ */
+export function analyzeStream(
+  tableId: string,
+  input: { sessionId?: string },
+  options: StreamChatOptions,
+) {
+  return postSSE(
+    `/api/v1/tables/${tableId}/analyze`,
+    { session_id: input.sessionId ?? '' },
+    {
+      signal: options.signal,
+      onEvent: ({ event, data }) => {
+        try {
+          options.onEvent(JSON.parse(data) as ChatEvent)
+        } catch {
+          options.onEvent({ type: 'error', message: `无法解析事件 ${event}` })
+        }
+      },
+    },
+  )
+}
+
 export function listSessions(tableId: string) {
   return request<ChatSession[]>(`/tables/${tableId}/sessions`)
 }

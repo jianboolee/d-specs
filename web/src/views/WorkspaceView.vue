@@ -10,7 +10,6 @@ import SpecCanvas from '@/components/table/SpecCanvas.vue'
 import { ApiError } from '@/api/http'
 import { useChatStore } from '@/stores/chat'
 import { useSpecTableStore } from '@/stores/specTable'
-import type { AnalyzeResult } from '@/types/api'
 import { formatRelativeTime } from '@/utils/time'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -251,25 +250,10 @@ async function handleSend(text: string) {
   if (chat.lastError) toast.error(chat.lastError)
 }
 
-// ---------- AI 分析 ----------
-
-const analyzing = ref(false)
-const showAnalysis = ref(false)
-const analysis = ref<AnalyzeResult | null>(null)
-
-async function handleAnalyze() {
-  if (analyzing.value || !spec.table) return
-  analyzing.value = true
-  showAnalysis.value = true
-  analysis.value = null
-  try {
-    analysis.value = await spec.analyzeTable()
-  } catch (err) {
-    showAnalysis.value = false
-    toast.error(err instanceof ApiError ? err.message : '分析失败')
-  } finally {
-    analyzing.value = false
-  }
+/** 让 AI 通读当前表，指出产品类型与还缺哪些关键参数（只给建议，不改动表格） */
+async function handleAnalyzeTurn() {
+  await chat.analyze()
+  if (chat.lastError) toast.error(chat.lastError)
 }
 
 async function handleUndoMessage(messageId: string) {
@@ -347,8 +331,10 @@ async function handleUndoMessage(messageId: string) {
           <ChatPanel
             :messages="chat.messages"
             :sending="chat.sending"
+            :analyzing="chat.analyzing"
             :loading="chat.loadingHistory"
             @send="handleSend"
+            @analyze="handleAnalyzeTurn"
             @stop="chat.abort"
             @undo="handleUndoMessage"
           >
@@ -369,7 +355,6 @@ async function handleUndoMessage(messageId: string) {
           @add-item="handleAddItem"
           @remove-item="handleRemoveItem"
           @share="showShare = true"
-          @analyze="handleAnalyze"
           @undo="handleUndo"
           @redo="handleRedo"
         />
@@ -483,54 +468,6 @@ async function handleUndoMessage(messageId: string) {
       </AlertDialogContent>
     </AlertDialog>
 
-    <!-- AI 分析：产品类型 + 自动标签 + 补充建议 -->
-    <Dialog :open="showAnalysis" @update:open="(v) => !v && (showAnalysis = false)">
-      <DialogContent class="sm:max-w-[460px]">
-        <DialogHeader>
-          <DialogTitle>AI 分析</DialogTitle>
-          <DialogDescription>根据当前表内容识别产品类型，并给出还可以补充哪些关键参数</DialogDescription>
-        </DialogHeader>
-
-        <div v-if="analyzing" class="analysis-loading">
-          <i class="ri-loader-4-line spin" />
-          <span>正在分析这张表…</span>
-        </div>
-
-        <div v-else-if="analysis" class="analysis-body">
-          <div class="analysis-field">
-            <span class="analysis-label">产品类型</span>
-            <span class="analysis-type">{{ analysis.product_type || '未能判断' }}</span>
-          </div>
-
-          <div class="analysis-field">
-            <span class="analysis-label">自动标签</span>
-            <div v-if="analysis.tags.length" class="analysis-tags">
-              <span v-for="t in analysis.tags" :key="t" class="tag-chip">{{ t }}</span>
-            </div>
-            <span v-else class="analysis-empty">未生成标签</span>
-          </div>
-
-          <div class="analysis-field">
-            <span class="analysis-label">建议补充的参数</span>
-            <ul v-if="analysis.suggestions.length" class="analysis-list">
-              <li v-for="s in analysis.suggestions" :key="s.name">
-                <span class="analysis-name">{{ s.name }}</span>
-                <span v-if="s.reason" class="analysis-reason">{{ s.reason }}</span>
-              </li>
-            </ul>
-            <span v-else class="analysis-empty">暂时没有补充建议，这张表看起来已经比较完整</span>
-          </div>
-
-          <p class="analysis-hint">
-            标签已自动保存到这张表。需要补充参数时，在左侧对话里直接告诉 AI 即可。
-          </p>
-        </div>
-
-        <DialogFooter>
-          <Button @click="showAnalysis = false">完成</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   </div>
 </template>
 
@@ -710,105 +647,5 @@ async function handleUndoMessage(messageId: string) {
 .chat-col > :deep(.chat) {
   flex: 1;
   min-height: 0;
-}
-
-/* ---------- AI 分析弹窗 ---------- */
-
-.analysis-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 32px 0;
-  color: var(--ds-text-tertiary);
-  font-size: var(--ds-font-sm);
-}
-
-.analysis-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.analysis-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.analysis-label {
-  font-size: var(--ds-font-xs);
-  color: var(--ds-text-tertiary);
-}
-
-.analysis-type {
-  font-size: var(--ds-font-base);
-  font-weight: 600;
-  color: var(--ds-text);
-}
-
-.analysis-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.tag-chip {
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: var(--ds-primary-soft);
-  color: var(--ds-text);
-  font-size: var(--ds-font-xs);
-}
-
-.analysis-list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.analysis-list li {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--ds-surface-muted);
-}
-
-.analysis-name {
-  font-size: var(--ds-font-sm);
-  color: var(--ds-text);
-  font-weight: 500;
-}
-
-.analysis-reason {
-  font-size: var(--ds-font-xs);
-  color: var(--ds-text-secondary);
-}
-
-.analysis-empty {
-  font-size: var(--ds-font-xs);
-  color: var(--ds-text-tertiary);
-}
-
-.analysis-hint {
-  margin: 0;
-  font-size: var(--ds-font-xs);
-  color: var(--ds-text-tertiary);
-  line-height: 1.7;
-}
-
-.spin {
-  animation: spin 1.1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

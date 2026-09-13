@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jianboolee/d-specs/internal/ai/baseline"
 	"github.com/jianboolee/d-specs/internal/ai/provider"
 	"github.com/jianboolee/d-specs/internal/config"
 	"github.com/jianboolee/d-specs/internal/modules/spec"
@@ -55,7 +56,9 @@ const systemPrompt = `你是「参数配置表」的产品分析助手。根据�
 - product_type：用最贴切的中文短语概括产品类型，例如「房车」「汽车配件」「电子消费品」「家用电器」「工业设备」。
 - tags：2 到 5 个中文短标签，用于归类与展示。保留大小写与专有名词写法，不要带标点、不要重复。
 - suggestions：0 到 6 条，列出这类产品通常必备、但当前表里还没有的参数。每条给参数名和一句话理由。
-  只建议真正缺失的关键参数（例如品牌、型号、指导价、上市时间），不要把表里已有的参数再列一遍。
+  只建议真正缺失的关键参数，不要把表里已有的参数再列一遍。
+- 「品牌」「型号」是所有参数表的基础参数（谁家的、哪一款）。只要表里还没有，就必须排在
+  suggestions 的最前面，再列其他建议。
 - 如果参数太少、无法判断，就给出你能判断的最接近的类型，并尽量给出建议。`
 
 // Analyze 分析一张表：识别产品类型、自动打标签、给出补充建议。
@@ -179,6 +182,15 @@ func buildUserPrompt(detail *spec.DetailResult) string {
 			}
 			b.WriteString("\n")
 		}
+	}
+
+	// 基础参数缺失与否由服务端算好，避免模型在长清单里漏看
+	names := make([]string, 0, len(detail.Items))
+	for _, it := range detail.Items {
+		names = append(names, it.Name)
+	}
+	if missing := baseline.Missing(names); len(missing) > 0 {
+		fmt.Fprintf(&b, "\n缺少的基础参数：%s。请在 suggestions 最前面列出。\n", strings.Join(missing, "、"))
 	}
 
 	b.WriteString("\n请判断产品类型、给出标签与建议，只输出 JSON。")

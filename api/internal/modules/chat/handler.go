@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/jianboolee/d-specs/internal/contextx"
+	"github.com/jianboolee/d-specs/internal/modules/analysis"
 	"github.com/jianboolee/d-specs/internal/modules/spec"
 	"github.com/jianboolee/d-specs/internal/response"
 
@@ -45,6 +46,50 @@ func (h *Handler) Stream(c *gin.Context) {
 		return
 	}
 
+	emit, ok := startSSE(c, ctx)
+	if !ok {
+		return
+	}
+	runSSE(ctx, emit, func(push Emit) error {
+		return h.svc.Stream(ctx, userID, tableID, req, push)
+	})
+}
+
+// Analyze POST /api/v1/tables/:id/analyze
+//
+// 与聊天同一条 SSE 通道：「完善参数表」对用户来说就是一轮对话。
+// 前置校验同样必须在写 SSE 头之前完成。
+func (h *Handler) Analyze(c *gin.Context) {
+	userID, ok := requireUser(c)
+	if !ok {
+		return
+	}
+
+	var req AnalyzeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BindError(c, err)
+		return
+	}
+
+	tableID := c.Param("id")
+	ctx := c.Request.Context()
+
+	if err := h.svc.PrepareAnalyze(ctx, userID, tableID); err != nil {
+		writeError(c, err)
+		return
+	}
+
+	emit, ok := startSSE(c, ctx)
+	if !ok {
+		return
+	}
+	runSSE(ctx, emit, func(push Emit) error {
+		return h.svc.Analyze(ctx, userID, tableID, req, push)
+	})
+}
+
+// startSSE 写好 SSE 响应头并返回 emit 闭包；底层不支持 flush 时返回 false。
+func startSSE(c *gin.Context, ctx context.Context) (Emit, bool) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
@@ -54,7 +99,7 @@ func (h *Handler) Stream(c *gin.Context) {
 
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
-		return
+		return nil, false
 	}
 	flusher.Flush()
 
@@ -69,8 +114,12 @@ func (h *Handler) Stream(c *gin.Context) {
 		flusher.Flush()
 		return ctx.Err()
 	}
+	return emit, true
+}
 
-	streamErr := h.svc.Stream(ctx, userID, tableID, req, emit)
+// runSSE 执行流式回调，并把中途的失败转成一个 error 事件推给前端。
+func runSSE(ctx context.Context, emit Emit, run func(Emit) error) {
+	streamErr := run(emit)
 	if streamErr == nil {
 		return
 	}
@@ -129,6 +178,8 @@ func writeError(c *gin.Context, err error) {
 	case errors.Is(err, ErrSessionNotFound):
 		response.Error(c, http.StatusNotFound, 404, err.Error())
 	case errors.Is(err, ErrEmptyMessage):
+		response.Error(c, http.StatusBadRequest, 400, err.Error())
+	case errors.Is(err, analysis.ErrNothingToAnalyze):
 		response.Error(c, http.StatusBadRequest, 400, err.Error())
 	case errors.Is(err, spec.ErrTableNotFound):
 		response.Error(c, http.StatusNotFound, 404, err.Error())

@@ -1,6 +1,5 @@
 import { request } from './http'
 import type {
-  AnalyzeResult,
   ApplyResult,
   ChangeSource,
   Op,
@@ -51,21 +50,14 @@ export function deleteTable(id: string) {
   return request<{ deleted: boolean }>(`/tables/${id}`, { method: 'DELETE' })
 }
 
-/** 复制表：换产品改几个值的高频操作 */
+/**
+ * 复制表：换产品改几个值的高频操作
+ */
 export function duplicateTable(id: string, title: string) {
   return request<TableDetailResult>(`/tables/${id}/duplicate`, {
     method: 'POST',
     body: { title },
   })
-}
-
-/**
- * AI 分析：识别产品类型、自动打标签（服务端已落库），并返回补充建议。
- *
- * 一次性请求，不走 SSE —— 分析是单次结构化调用，没有流式展示的必要。
- */
-export function analyzeTable(id: string) {
-  return request<AnalyzeResult>(`/tables/${id}/analyze`, { method: 'POST' })
 }
 
 export interface ApplyInput {

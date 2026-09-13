@@ -3,6 +3,7 @@ package chat
 import (
 	"time"
 
+	"github.com/jianboolee/d-specs/internal/ai/followups"
 	"github.com/jianboolee/d-specs/internal/ai/provider"
 )
 
@@ -92,6 +93,9 @@ type Event struct {
 	MessageID string       `json:"message_id,omitempty"`
 	Reply     string       `json:"reply,omitempty"`
 	Usage     *UsageView   `json:"usage,omitempty"`
+	// Actions 基于本轮回复生成的建议动作，随 done 事件下发。
+	// 刻意不落库：它们只服务于当前这一轮交互，刷新或切换会话后即消失。
+	Actions []followups.Action `json:"actions,omitempty"`
 }
 
 // ChangeView 变更摘要，前端据此高亮
@@ -129,6 +133,15 @@ type SendRequest struct {
 	// 上限 36 是 UUID v7 的字符串长度（见 internal/infrastructure/idgen）
 	SessionID string `json:"session_id" binding:"max=36"`
 	Message   string `json:"message" binding:"required,max=4000"`
+}
+
+// AnalyzeRequest 触发一轮「完善参数表」分析。
+//
+// 没有 message 字段：这一轮不是用户发言，而是系统发起的产品分析，
+// 因此只带会话号，分析本身由服务端取当前表内容完成。
+type AnalyzeRequest struct {
+	// SessionID 为空时自动新建会话
+	SessionID string `json:"session_id" binding:"max=36"`
 }
 
 type SessionView struct {

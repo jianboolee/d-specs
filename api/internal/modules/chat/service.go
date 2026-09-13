@@ -8,9 +8,11 @@ import (
 	"strings"
 
 	"github.com/jianboolee/d-specs/internal/ai/agent"
+	"github.com/jianboolee/d-specs/internal/ai/followups"
 	"github.com/jianboolee/d-specs/internal/ai/ops"
 	"github.com/jianboolee/d-specs/internal/ai/provider"
 	"github.com/jianboolee/d-specs/internal/config"
+	"github.com/jianboolee/d-specs/internal/modules/analysis"
 	"github.com/jianboolee/d-specs/internal/modules/spec"
 )
 
@@ -25,14 +27,23 @@ var (
 )
 
 type Service struct {
-	repo    *Repository
-	specSvc *spec.Service
-	llm     provider.Provider
-	cfg     *config.Config
+	repo        *Repository
+	specSvc     *spec.Service
+	analysisSvc *analysis.Service
+	followups   *followups.Generator
+	llm         provider.Provider
+	cfg         *config.Config
 }
 
-func NewService(repo *Repository, specSvc *spec.Service, llm provider.Provider, cfg *config.Config) *Service {
-	return &Service{repo: repo, specSvc: specSvc, llm: llm, cfg: cfg}
+func NewService(repo *Repository, specSvc *spec.Service, analysisSvc *analysis.Service, llm provider.Provider, cfg *config.Config) *Service {
+	return &Service{
+		repo:        repo,
+		specSvc:     specSvc,
+		analysisSvc: analysisSvc,
+		followups:   followups.New(llm),
+		llm:         llm,
+		cfg:         cfg,
+	}
 }
 
 // Prepare 在建立 SSE 流之前做前置校验。
@@ -173,12 +184,92 @@ func (s *Service) Stream(ctx context.Context, userID, tableID string, req SendRe
 	}
 	_ = s.repo.TouchSession(ctx, session.ID)
 
+	// 建议动作在回复落库之后生成：它是锦上添花，失败也不影响这轮已经完成的结果
+	actions := s.followups.Suggest(ctx, detail.Table.Title, text, res.Reply)
+
 	return emit(Event{
 		Type:      EventDone,
 		SessionID: session.ID,
 		MessageID: assistant.ID,
 		Reply:     res.Reply,
 		Usage:     toUsageView(res.Usage),
+		Actions:   actions,
+	})
+}
+
+// PrepareAnalyze 在建立 SSE 流之前做前置校验。
+//
+// 与 Prepare 同样的道理：「表不存在」「AI 未配置」「表里还没有参数」都必须在
+// 写 SSE 响应头之前暴露成正常的 JSON 错误，否则前端只能从流里读 error 事件，
+// 失去了用状态码区分错误的能力。
+func (s *Service) PrepareAnalyze(ctx context.Context, userID, tableID string) error {
+	if s.analysisSvc == nil || s.llm == nil {
+		return analysis.ErrLLMUnavailable
+	}
+	detail, err := s.specSvc.Detail(ctx, userID, tableID)
+	if err != nil {
+		return err
+	}
+	if len(detail.Items) == 0 {
+		return analysis.ErrNothingToAnalyze
+	}
+	return nil
+}
+
+// Analyze 触发一轮「完善参数表」分析，并按一轮对话的形态返回。
+//
+// 复用 analysis.Service：它负责识别产品类型、落库标签并给出补充建议，全程不写
+// 参数项 —— 补哪些参数由用户看完建议后自己决定。结果作为一条 assistant 消息落库，
+// 这样切换或刷新会话后仍然可见。
+func (s *Service) Analyze(ctx context.Context, userID, tableID string, req AnalyzeRequest, emit Emit) error {
+	if s.analysisSvc == nil || s.llm == nil {
+		return analysis.ErrLLMUnavailable
+	}
+
+	// PrepareAnalyze 只是前端友好的前置提示，越权的真正防线在这里
+	detail, err := s.specSvc.Detail(ctx, userID, tableID)
+	if err != nil {
+		return err
+	}
+
+	session, err := s.repo.GetOrCreateSession(ctx, userID, tableID, req.SessionID, "完善参数表")
+	if err != nil {
+		return err
+	}
+
+	if err := emit(Event{Type: EventStart, SessionID: session.ID}); err != nil {
+		return err
+	}
+
+	res, err := s.analysisSvc.Analyze(ctx, userID, tableID)
+	if err != nil {
+		return err
+	}
+
+	reply := res.Markdown()
+	assistant := &ChatMessage{
+		SessionID: session.ID,
+		Role:      RoleAssistant,
+		Content:   reply,
+	}
+	if err := s.repo.SaveMessage(ctx, assistant); err != nil {
+		return err
+	}
+	_ = s.repo.TouchSession(ctx, session.ID)
+
+	if err := emit(Event{Type: EventText, Text: reply}); err != nil {
+		return err
+	}
+
+	// 没有对应的用户发言，userMessage 留空，让模型只依据这份建议发挥
+	actions := s.followups.Suggest(ctx, detail.Table.Title, "", reply)
+
+	return emit(Event{
+		Type:      EventDone,
+		SessionID: session.ID,
+		MessageID: assistant.ID,
+		Reply:     reply,
+		Actions:   actions,
 	})
 }
 
