@@ -8,6 +8,7 @@ import ChatPanel from '@/components/chat/ChatPanel.vue'
 import ShareDialog from '@/components/table/ShareDialog.vue'
 import SpecCanvas from '@/components/table/SpecCanvas.vue'
 import { useCanvas } from '@/composables/useCanvas'
+import { useIsMobile, useMobileShell } from '@/composables/useMobileShell'
 import { ApiError } from '@/api/http'
 import * as shareApi from '@/api/share'
 import { useChatStore } from '@/stores/chat'
@@ -54,6 +55,10 @@ const chat = useChatStore()
 
 // 画布收起状态：收起按钮在 SpecCanvas 头部，收起后由 chat-head 右侧按钮还原
 const { collapsed: canvasCollapsed, toggle: toggleCanvas } = useCanvas()
+
+// 手机上画布是全屏覆盖层，从头部「参数表」按钮打开
+const isMobile = useIsMobile()
+const { openCanvas } = useMobileShell()
 
 const tableId = computed(() => String(route.params.id ?? ''))
 
@@ -436,7 +441,12 @@ async function handleUndoMessage(messageId: string) {
             <div class="head-actions">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <button type="button" class="head-btn" @click="showSessions = true">
+                  <button
+                    type="button"
+                    class="head-btn"
+                    aria-label="历史对话"
+                    @click="showSessions = true"
+                  >
                     <i class="ri-history-line" />
                     <span v-if="chat.hasHistory" class="badge">{{ chat.sessions.length }}</span>
                   </button>
@@ -446,15 +456,35 @@ async function handleUndoMessage(messageId: string) {
 
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <button type="button" class="head-btn" @click="startNewSession">
+                  <button
+                    type="button"
+                    class="head-btn"
+                    aria-label="新建对话"
+                    @click="startNewSession"
+                  >
                     <i class="ri-add-line" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">新建对话</TooltipContent>
               </Tooltip>
 
-              <!-- 画布收起后从头部还原，收起按钮在画布自己的头部（见 SpecCanvas） -->
-              <Tooltip v-if="canvasCollapsed">
+              <!-- 手机上打开全屏参数表覆盖层 -->
+              <Tooltip v-if="isMobile">
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    class="head-btn"
+                    aria-label="打开参数表"
+                    @click="openCanvas"
+                  >
+                    <i class="ri-table-line" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">参数表</TooltipContent>
+              </Tooltip>
+
+              <!-- 桌面：画布收起后从头部还原，收起按钮在画布自己的头部（见 SpecCanvas） -->
+              <Tooltip v-else-if="canvasCollapsed">
                 <TooltipTrigger as-child>
                   <button
                     type="button"
@@ -799,5 +829,19 @@ async function handleUndoMessage(messageId: string) {
 .chat-col > :deep(.chat) {
   flex: 1;
   min-height: 0;
+}
+
+/* ==================== 手机端 ==================== */
+
+@media (max-width: 768px) {
+  /* 给左上角的汉堡按钮让位（见 AppSidebar），否则标题会被压在下面 */
+  .chat-head {
+    padding-left: 58px;
+    gap: 8px;
+  }
+
+  .head-actions {
+    gap: 2px;
+  }
 }
 </style>

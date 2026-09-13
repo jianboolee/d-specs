@@ -3,6 +3,7 @@ import { computed, nextTick, ref } from 'vue'
 
 import type { SpecItem } from '@/types/api'
 import { useCanvas } from '@/composables/useCanvas'
+import { useIsMobile, useMobileShell } from '@/composables/useMobileShell'
 import {
   Tooltip,
   TooltipContent,
@@ -44,6 +45,13 @@ const emit = defineEmits<{
 }>()
 
 const { collapsed, toggle: toggleCanvas } = useCanvas()
+
+// 手机上画布是全屏覆盖层，用临时的 canvasOpen 控制，不碰桌面那套持久化收起状态
+const isMobile = useIsMobile()
+const { canvasOpen, closeCanvas } = useMobileShell()
+
+// 对外「看不见」的统一判断：手机看覆盖层，桌面看收起态
+const hidden = computed(() => (isMobile.value ? !canvasOpen.value : collapsed.value))
 
 interface ItemGroup {
   name: string
@@ -126,7 +134,11 @@ function isHighlighted(id: string) {
 
 <template>
   <!-- 收起后宽度为 0，inert 让内部按钮一并退出键盘焦点顺序 -->
-  <section class="canvas" :class="{ collapsed }" :inert="collapsed">
+  <section
+    class="canvas"
+    :class="{ collapsed: collapsed && !isMobile, 'mobile-open': canvasOpen }"
+    :inert="hidden"
+  >
     <header class="canvas-head">
       <span v-if="saving" class="saving">
         <i class="ri-loader-4-line spin" />
@@ -185,8 +197,23 @@ function isHighlighted(id: string) {
           <TooltipContent side="bottom">生成只读链接分享这张表</TooltipContent>
         </Tooltip>
 
+        <!-- 手机上画布是全屏覆盖层，这个按钮是关闭；桌面则是收起成 0 宽 -->
+        <Tooltip v-if="isMobile">
+          <TooltipTrigger as-child>
+            <button
+              type="button"
+              class="ghost-btn icon-only"
+              aria-label="关闭参数表"
+              @click="closeCanvas"
+            >
+              <i class="ri-close-line" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">关闭</TooltipContent>
+        </Tooltip>
+
         <!-- 收起后画布完全让位给对话区，从对话头部按钮还原（见 WorkspaceView） -->
-        <Tooltip>
+        <Tooltip v-else>
           <TooltipTrigger as-child>
             <button
               type="button"
@@ -647,5 +674,40 @@ function isHighlighted(id: string) {
   background: transparent;
   border-color: var(--ds-border);
   color: var(--ds-text-secondary);
+}
+
+/* 触屏没有 hover：行删除按钮改为常驻，否则它在手机上等于不存在 */
+@media (hover: none) {
+  .row-btn {
+    opacity: 1;
+  }
+}
+
+/* ==================== 手机端：画布变全屏覆盖层 ==================== */
+
+@media (max-width: 768px) {
+  .canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    width: 100%;
+    border-left: none;
+    /* 收在屏幕右侧之外，打开时滑入 */
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+  }
+
+  .canvas.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* 桌面按比例自适应，手机上直接铺满，内边距也收一点 */
+  .canvas-head {
+    padding: 0 12px 0 16px;
+  }
+
+  .canvas-body {
+    padding: 14px 14px 24px;
+  }
 }
 </style>

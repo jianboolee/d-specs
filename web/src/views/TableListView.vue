@@ -457,4 +457,17 @@ function describe(err: unknown) {
 .time {
   margin-left: auto;
 }
+
+/* ==================== 手机端 ==================== */
+
+@media (max-width: 768px) {
+  /* 给左上角汉堡按钮让位（见 AppSidebar） */
+  .topbar {
+    padding-left: 56px;
+  }
+
+  .content {
+    padding: 16px;
+  }
+}
 </style>

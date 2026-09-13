@@ -19,6 +19,7 @@ import { useSpecTableStore } from '@/stores/specTable'
 import { useCreateTable } from '@/composables/useCreateTable'
 import { useThemeMode } from '@/composables/useThemeMode'
 import { useSidebar } from '@/composables/useSidebar'
+import { useIsMobile, useMobileShell } from '@/composables/useMobileShell'
 import BrandMark from '@/components/BrandMark.vue'
 import TableSearchDialog from '@/components/table/TableSearchDialog.vue'
 import type { TableSummary } from '@/types/api'
@@ -29,7 +30,12 @@ const auth = useAuthStore()
 const spec = useSpecTableStore()
 const { open: openCreate } = useCreateTable()
 const { mode: themeMode, toggle: toggleTheme } = useThemeMode()
-const { collapsed, toggle: toggleSidebar } = useSidebar()
+const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebar()
+
+// 手机上侧栏是抽屉，不用桌面那套「收起成图标」的形态
+const isMobile = useIsMobile()
+const { sidebarOpen, openSidebar, closeSidebar } = useMobileShell()
+const isCollapsed = computed(() => !isMobile.value && sidebarCollapsed.value)
 
 const showSearch = ref(false)
 
@@ -73,17 +79,20 @@ function onLogout() {
 }
 
 function openTable(id: string) {
+  closeSidebar()
   if (activeId.value === id) return
   void router.push({ name: 'workspace', params: { id } })
 }
 
 // 直接唤起全局新建弹窗，停在当前页，不再跳到列表页
 function goCreate() {
+  closeSidebar()
   openCreate()
 }
 
 // 「全部」直接打开参数表列表页
 function goAll() {
+  closeSidebar()
   void router.push({ name: 'tables' })
 }
 
@@ -94,6 +103,7 @@ function goAll() {
  * 跳过去就回不来，还会丢掉当前正在编辑的表。
  */
 function openDiscover() {
+  closeSidebar()
   window.open('/discover', '_blank', 'noopener')
 }
 
@@ -109,9 +119,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ collapsed }">
+  <!-- 手机上抽屉打开时的背景遮罩：点击关闭。加 isMobile 守卫，避免抽屉开着时
+       把窗口拉宽到桌面，遮罩残留下来盖住整个桌面布局 -->
+  <div v-if="sidebarOpen && isMobile" class="sidebar-backdrop" @click="closeSidebar" />
+
+  <!-- 手机上收纳侧栏后的入口：固定左上角，三个带侧栏的页面共用 -->
+  <button v-if="isMobile && !sidebarOpen" class="hamburger" type="button" aria-label="打开侧栏" @click="openSidebar">
+    <i class="ri-menu-line" />
+  </button>
+
+  <aside class="sidebar" :class="{ collapsed: isCollapsed, 'mobile-open': sidebarOpen }">
     <div class="sidebar-head">
-      <template v-if="!collapsed">
+      <template v-if="!isCollapsed">
         <button class="brand-btn" type="button" title="返回工作台" @click="router.push({ name: 'dashboard' })">
           <BrandMark :size="26" />
         </button>
@@ -126,15 +145,15 @@ onMounted(() => {
             <i class="ri-layout-left-line" />
           </button>
         </TooltipTrigger>
-        <TooltipContent :side="collapsed ? 'right' : 'bottom'">
-          {{ collapsed ? '展开侧栏' : '收起侧栏' }}
+        <TooltipContent :side="isCollapsed ? 'right' : 'bottom'">
+          {{ isCollapsed ? '展开侧栏' : '收起侧栏' }}
         </TooltipContent>
       </Tooltip>
     </div>
 
-    <button class="new-btn" type="button" :title="collapsed ? '新建参数表' : undefined" @click="goCreate">
+    <button class="new-btn" type="button" :title="isCollapsed ? '新建参数表' : undefined" @click="goCreate">
       <i class="ri-add-line" />
-      <span v-if="!collapsed">新建参数表</span>
+      <span v-if="!isCollapsed">新建参数表</span>
     </button>
 
     <!-- 新建 / 搜索 / 发现 / 我的参数表 归为一组：都是「动作」，与下面的表列表分开 -->
@@ -142,33 +161,33 @@ onMounted(() => {
       <button
         type="button"
         class="table-item"
-        :title="collapsed ? '搜索参数表' : undefined"
+        :title="isCollapsed ? '搜索参数表' : undefined"
         @click="showSearch = true"
       >
         <i class="ri-search-line" />
-        <span v-if="!collapsed" class="ds-ellipsis">搜索</span>
+        <span v-if="!isCollapsed" class="ds-ellipsis">搜索</span>
       </button>
 
       <button
         type="button"
         class="table-item"
-        :title="collapsed ? '发现' : undefined"
+        :title="isCollapsed ? '发现' : undefined"
         @click="openDiscover"
       >
         <i class="ri-compass-3-line" />
-        <span v-if="!collapsed" class="ds-ellipsis">发现</span>
+        <span v-if="!isCollapsed" class="ds-ellipsis">发现</span>
       </button>
 
       <button
         type="button"
         class="table-item"
         :class="{ active: isAllActive }"
-        :title="collapsed ? '我的参数表' : undefined"
+        :title="isCollapsed ? '我的参数表' : undefined"
         @click="goAll"
       >
         <i class="ri-folder-line" />
-        <span v-if="!collapsed" class="ds-ellipsis">我的参数表</span>
-        <span v-if="!collapsed && spec.tables.length > 0" class="item-count">
+        <span v-if="!isCollapsed" class="ds-ellipsis">我的参数表</span>
+        <span v-if="!isCollapsed && spec.tables.length > 0" class="item-count">
           {{ spec.tables.length }}
         </span>
       </button>
@@ -176,7 +195,7 @@ onMounted(() => {
 
     <div class="table-list ds-scroll-y">
       <!-- 收起时只保留上面的入口，不铺开具体表 -->
-      <template v-if="!collapsed">
+      <template v-if="!isCollapsed">
         <!-- 置顶表单独成组；没有置顶时不显示任何分组标题，保持原来的平铺 -->
         <template v-for="group in tableGroups" :key="group.label || 'all'">
           <div v-if="group.label" class="list-group-label">{{ group.label }}</div>
@@ -205,13 +224,13 @@ onMounted(() => {
     <div class="sidebar-foot">
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
-          <button class="user-btn" type="button" :title="collapsed ? displayName : undefined">
+          <button class="user-btn" type="button" :title="isCollapsed ? displayName : undefined">
             <span class="avatar">{{ avatarText }}</span>
-            <span v-if="!collapsed" class="user-meta">
+            <span v-if="!isCollapsed" class="user-meta">
               <span class="ds-ellipsis user-name">{{ displayName }}</span>
               <span class="ds-ellipsis user-sub">{{ auth.user?.email }}</span>
             </span>
-            <i v-if="!collapsed" class="ri-more-2-fill" />
+            <i v-if="!isCollapsed" class="ri-more-2-fill" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" class="w-52 ring-0">
@@ -492,5 +511,61 @@ onMounted(() => {
   flex: none;
   color: var(--ds-text-tertiary);
   font-size: var(--ds-font-base);
+}
+
+/* ==================== 手机端：侧栏变抽屉 ==================== */
+
+/* 汉堡按钮仅手机出现（模板里已用 isMobile 控制），桌面这些规则全部不生效 */
+.hamburger {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 40;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ds-text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.hamburger:hover {
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+}
+
+/* 遮罩默认不存在，只在手机上打开抽屉时由模板渲染 */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    width: min(82vw, 300px);
+    /* 抽屉收在屏幕外，打开时滑入 */
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  /* 手机上用抽屉＋遮罩，桌面那套「收起成图标」的按钮不再需要 */
+  .collapse-btn {
+    display: none;
+  }
 }
 </style>

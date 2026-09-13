@@ -130,4 +130,17 @@ onMounted(() => {
   font-size: var(--ds-font-xs);
   line-height: 1.7;
 }
+
+/* ==================== 手机端 ==================== */
+
+@media (max-width: 768px) {
+  /* 收窄内边距，也让居中内容离左上角汉堡按钮更远 */
+  .hero {
+    padding: 32px 20px 48px;
+  }
+
+  .hero h1 {
+    font-size: 21px;
+  }
+}
 </style>
