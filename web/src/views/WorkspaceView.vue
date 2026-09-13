@@ -658,11 +658,11 @@ async function handleUndoMessage(messageId: string) {
   line-height: 1.3;
 }
 
-/* 已开启分享：与侧栏同款浅蓝圆点，放在标题左侧 */
+/* 已开启分享：与侧栏同款浅绿圆点，放在标题左侧 */
 .head-share-dot {
   flex: none;
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--ds-share-dot);
 }

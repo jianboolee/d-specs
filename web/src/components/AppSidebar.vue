@@ -390,11 +390,12 @@ onMounted(() => {
 /* 已公开分享：圆点绝对定位在左侧图标列，不占位、不影响标题对齐 */
 .dot-public {
   position: absolute;
-  left: 16px;
+  /* 4px 圆点居中于图标列（图标列 10~28，中心 19） */
+  left: 17px;
   top: 50%;
   transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--ds-share-dot);
 }

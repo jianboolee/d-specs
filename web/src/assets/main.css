@@ -24,8 +24,8 @@
   --ds-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --ds-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
 
-  /* 已公开分享的轻量标识色：浅蓝，在浅色/深色侧栏上都够醒目又不抢视线 */
-  --ds-share-dot: #7cb8e8;
+  /* 已公开分享的轻量标识色：浅绿，在浅色/深色侧栏上都够醒目又不抢视线 */
+  --ds-share-dot: #86d18a;
 
   --ds-sidebar-width: 248px;
   /* 对话正文列最大宽度：对齐主流 AI 对话（ChatGPT/Claude/DeepSeek 均为 48rem），
