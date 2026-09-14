@@ -5,8 +5,9 @@ import { toast } from 'vue-sonner'
 
 import AppSidebar from '@/components/AppSidebar.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
-import ShareDialog from '@/components/table/ShareDialog.vue'
 import SpecCanvas from '@/components/table/SpecCanvas.vue'
+import ShareDialog from '@/components/table/ShareDialog.vue'
+import TableActionsMenu from '@/components/table/TableActionsMenu.vue'
 import { useCanvas } from '@/composables/useCanvas'
 import { useIsMobile, useMobileShell } from '@/composables/useMobileShell'
 import { ApiError } from '@/api/http'
@@ -16,19 +17,10 @@ import { useSpecTableStore } from '@/stores/specTable'
 import { formatRelativeTime } from '@/utils/time'
 import type { ShareStatus } from '@/types/api'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -66,38 +58,23 @@ const title = computed(() => spec.table?.title ?? '')
 const description = computed(() => spec.table?.description ?? '')
 const revision = computed(() => spec.table?.current_revision ?? 0)
 
-// ---------- 置顶 ----------
+// ---------- 表级操作 ----------
+//
+// 置顶/重命名/副本/分享/删除这些都在 TableActionsMenu 里，本页只保留标题旁
+// 那个「已开启分享」圆点需要的数据，以及复制/删除之后的去向。
 
-const pinned = computed(() => spec.table?.pinned === true)
-const pinBusy = ref(false)
-
-/** 置顶/取消置顶：侧栏与列表页共用同一份 spec.tables，刷新后顺序即时生效 */
-async function togglePin() {
-  const table = spec.table
-  if (!table || pinBusy.value) return
-  pinBusy.value = true
-  try {
-    await spec.setPinned(table.id, !pinned.value)
-    toast.success(pinned.value ? '已置顶' : '已取消置顶')
-  } catch (err) {
-    toast.error(err instanceof ApiError ? err.message : '操作失败')
-  } finally {
-    pinBusy.value = false
-  }
-}
-
-const showShare = ref(false)
 const showSessions = ref(false)
 
-// ---------- 分享 ----------
+// 画布工具栏上也有一个「分享」按钮，它直接打开分享弹窗（菜单里那份在 TableActionsMenu 内）
+const showShare = ref(false)
+
+// ---------- 分享状态（供标题圆点使用） ----------
 
 const shareStatus = ref<ShareStatus | null>(null)
-const shareBusy = ref(false)
 
 const shareEnabled = computed(() => shareStatus.value?.enabled === true)
-const shareUrl = computed(() => shareStatus.value?.url ?? '')
 
-/** 拉一次分享状态：标题旁的公开标识、菜单里的开启/关闭与预览都依赖它 */
+/** 拉一次分享状态：标题旁的公开标识依赖它 */
 async function loadShareStatus() {
   if (!tableId.value) return
   try {
@@ -108,108 +85,33 @@ async function loadShareStatus() {
   }
 }
 
-/** 菜单里的一键开启/关闭，省去打开分享弹窗 */
-async function toggleShare() {
-  if (!spec.table || shareBusy.value) return
-  shareBusy.value = true
-  try {
-    shareStatus.value = shareEnabled.value
-      ? await shareApi.disableShare(spec.table.id)
-      : await shareApi.enableShare(spec.table.id)
-    toast.success(shareEnabled.value ? '已开启分享' : '已关闭分享，原链接立即失效')
-    // 侧栏的公开标识读列表里的 visibility，刷新一次让它同步
-    void spec.loadTables()
-  } catch (err) {
-    toast.error(err instanceof ApiError ? err.message : '操作失败')
-  } finally {
-    shareBusy.value = false
-  }
-}
-
-/** 预览公开页；未开启分享时不可点，因此 url 必然存在 */
-function previewShare() {
-  if (!shareUrl.value) return
-  window.open(shareUrl.value, '_blank', 'noopener')
-}
-
-/** 复制公开链接；未开启分享时不可点，因此 url 必然存在 */
-async function copyShareLink() {
-  if (!shareUrl.value) return
-  try {
-    // 后端返回相对路径，补成完整地址再复制
-    await navigator.clipboard.writeText(`${window.location.origin}${shareUrl.value}`)
-    toast.success('链接已复制')
-  } catch {
-    toast.warning('复制失败，请手动复制')
-  }
-}
-
-/** 分享弹窗里改了状态：重新拉取并同步侧栏 */
+/** 菜单里改过分享状态：重新拉取并同步侧栏的公开标识 */
 async function onShareChanged() {
   await loadShareStatus()
   void spec.loadTables()
 }
 
-// ---------- 表级操作（标题右侧的「操作」菜单） ----------
+// ---------- 操作后的去向 ----------
 
-/**
- * 重命名与复制共用一个「输入新名字」的弹窗：两者都只是换一个标题，
- * 区别只在复制会以新名字另建一份副本。
- */
-type NameAction = 'rename' | 'duplicate'
-
-const nameAction = ref<NameAction | null>(null)
-const nameValue = ref('')
-const nameSubmitting = ref(false)
-
-const nameDialogTitle = computed(() =>
-  nameAction.value === 'duplicate' ? '复制参数表' : '重命名参数表',
-)
-
-function openRename() {
-  nameAction.value = 'rename'
-  nameValue.value = title.value
+/** 复制完成后跳到副本：通常是为了改几个值做个变体，直接进去更顺手 */
+function goToTable(id: string) {
+  void router.push({ name: 'workspace', params: { id } })
 }
 
-function openDuplicate() {
-  nameAction.value = 'duplicate'
-  // 默认带上「副本」，用户多半会把它改成目标产品的名字
-  nameValue.value = `${title.value} 副本`
+/** 删除当前表后已无内容可看，回列表 */
+function goToTables() {
+  void router.replace({ name: 'tables' })
 }
 
-function closeNameDialog() {
-  if (nameSubmitting.value) return
-  nameAction.value = null
-}
-
-async function submitName() {
+/** 画布里就地改表名/描述 */
+async function handleUpdateMeta(patch: { title?: string; description?: string }) {
   const table = spec.table
-  const action = nameAction.value
-  const next = nameValue.value.trim()
-  if (!table || !action || !next || nameSubmitting.value) return
-
-  nameSubmitting.value = true
+  if (!table) return
   try {
-    if (action === 'duplicate') {
-      const res = await spec.duplicateTable(table.id, next)
-      toast.success(`已复制为「${res.table.title}」`)
-      nameAction.value = null
-      // 复制通常是为了改几个值做个变体，直接切到副本更顺手
-      void router.push({ name: 'workspace', params: { id: res.table.id } })
-      return
-    }
-
-    // 名字没变就不用发请求
-    if (next !== table.title) {
-      await spec.renameTable(table.id, next)
-      toast.success('已重命名')
-    }
-    nameAction.value = null
+    await spec.updateMeta(table.id, patch)
+    toast.success(patch.title ? '已重命名' : '已更新描述')
   } catch (err) {
-    const fallback = action === 'duplicate' ? '复制失败' : '重命名失败'
-    toast.error(err instanceof ApiError ? err.message : fallback)
-  } finally {
-    nameSubmitting.value = false
+    toast.error(err instanceof ApiError ? err.message : '更新失败')
   }
 }
 
@@ -313,22 +215,6 @@ async function confirmRemoveItem() {
   }
 }
 
-const removingTable = ref(false)
-
-async function confirmRemoveTable() {
-  const table = spec.table
-  if (!table) return
-  try {
-    await spec.removeTable(table.id)
-    toast.success(`已删除「${table.title}」`)
-    void router.replace({ name: 'tables' })
-  } catch (err) {
-    toast.error(err instanceof ApiError ? err.message : '删除失败')
-  } finally {
-    removingTable.value = false
-  }
-}
-
 async function handleUndo() {
   try {
     const res = await spec.undo()
@@ -392,50 +278,20 @@ async function handleUndoMessage(messageId: string) {
               <span class="head-title ds-ellipsis" :title="title">{{ title }}</span>
 
               <!-- 表级操作紧挨标题：它改的是这张表，和右侧的会话操作分开放 -->
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
+              <TableActionsMenu
+                :table="spec.table"
+                align="start"
+                :share-enabled="shareEnabled"
+                @duplicated="goToTable"
+                @deleted="goToTables"
+                @share-changed="onShareChanged"
+              >
+                <template #trigger>
                   <button type="button" class="head-btn" aria-label="参数表操作" title="参数表操作">
                     <i class="ri-more-line" />
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" class="min-w-[150px]">
-                  <DropdownMenuItem @select="togglePin">
-                    <i :class="pinned ? 'ri-unpin-line' : 'ri-pushpin-line'" />
-                    {{ pinned ? '取消置顶' : '置顶' }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @select="openDuplicate">
-                    <i class="ri-file-copy-line" />
-                    创建副本
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @select="openRename">
-                    <i class="ri-edit-line" />
-                    重命名
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @select="showShare = true">
-                    <i class="ri-share-forward-line" />
-                    分享
-                  </DropdownMenuItem>
-                  <!-- 快速开关，不必进分享弹窗 -->
-                  <DropdownMenuItem :disabled="shareBusy" @select="toggleShare">
-                    <i :class="shareEnabled ? 'ri-link-unlink-m' : 'ri-link'" />
-                    {{ shareEnabled ? '关闭分享' : '开启分享' }}
-                  </DropdownMenuItem>
-                  <!-- 未开启分享时没有公开地址，预览与复制链接都置灰 -->
-                  <DropdownMenuItem :disabled="!shareEnabled" @select="previewShare">
-                    <i class="ri-external-link-line" />
-                    预览
-                  </DropdownMenuItem>
-                  <DropdownMenuItem :disabled="!shareEnabled" @select="copyShareLink">
-                    <i class="ri-link-m" />
-                    复制链接
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" @select="removingTable = true">
-                    <i class="ri-delete-bin-line" />
-                    删除
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </template>
+              </TableActionsMenu>
             </div>
 
             <div class="head-actions">
@@ -518,6 +374,7 @@ async function handleUndoMessage(messageId: string) {
 
         <SpecCanvas
           :items="spec.items"
+          :title="title"
           :description="description"
           :highlight-ids="spec.highlightIds"
           :revision="revision"
@@ -525,6 +382,7 @@ async function handleUndoMessage(messageId: string) {
           :can-undo="spec.canUndo"
           :can-redo="spec.canRedo"
           @update-item="handleUpdateItem"
+          @update-meta="handleUpdateMeta"
           @add-item="handleAddItem"
           @remove-item="handleRemoveItem"
           @share="showShare = true"
@@ -539,6 +397,7 @@ async function handleUndoMessage(messageId: string) {
       </div>
     </main>
 
+    <!-- 画布工具栏「分享」按钮对应的弹窗（菜单里的那一个在 TableActionsMenu 内） -->
     <ShareDialog
       v-if="spec.table"
       v-model:show="showShare"
@@ -596,48 +455,6 @@ async function handleUndoMessage(messageId: string) {
         <AlertDialogFooter>
           <AlertDialogCancel @click="showRemoveItem = false">取消</AlertDialogCancel>
           <AlertDialogAction variant="destructive" @click="confirmRemoveItem">删除</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-
-    <!-- 重命名 / 复制（共用一个输入新名字的弹窗） -->
-    <Dialog :open="!!nameAction" @update:open="(v) => !v && closeNameDialog()">
-      <DialogContent class="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle>{{ nameDialogTitle }}</DialogTitle>
-          <DialogDescription v-if="nameAction === 'duplicate'">
-            将以新名字创建一份副本，包含当前全部参数。
-          </DialogDescription>
-        </DialogHeader>
-        <Input
-          v-model="nameValue"
-          maxlength="120"
-          placeholder="参数表名称"
-          autofocus
-          @keydown.enter.prevent="submitName"
-        />
-        <DialogFooter>
-          <Button variant="outline" :disabled="nameSubmitting" @click="closeNameDialog">取消</Button>
-          <Button :disabled="!nameValue.trim() || nameSubmitting" @click="submitName">
-            <i v-if="nameSubmitting" class="ri-loader-4-line animate-spin" />
-            {{ nameAction === 'duplicate' ? '创建副本' : '保存' }}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <!-- 删除参数表 -->
-    <AlertDialog :open="removingTable" @update:open="(v) => !v && (removingTable = false)">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>删除参数表</AlertDialogTitle>
-          <AlertDialogDescription>
-            确定删除「{{ spec.table?.title }}」？删除后该表不再出现在列表里。
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel @click="removingTable = false">取消</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" @click="confirmRemoveTable">删除</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
