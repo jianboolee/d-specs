@@ -68,8 +68,8 @@ func (s *Service) Prepare(ctx context.Context, userID, tableID, message string) 
 
 // tableSnapshot 组装给模型看的表状态。
 //
-// 除标题/描述/参数项外，还带上置顶与分享状态、公开链接：模型回答「预览」
-// 需要链接，判断「是否已置顶/已分享」也需要这两个状态做 no-op 判定。
+// 除标题/描述/参数项外，还带上置顶与分享状态、公开链接、导出页链接：
+// 模型回答「预览」「导出」需要它们，判断「是否已置顶/已分享」也要这两个状态做 no-op 判定。
 //
 // 分享状态读失败时降级为「未开启」而不是整轮报错：分享只是附加信息，
 // 不该因为它读不到就让用户连参数都改不了。
@@ -80,18 +80,26 @@ func (s *Service) tableSnapshot(ctx context.Context, userID, tableID string, det
 		Pinned:      detail.Table.Pinned,
 		Items:       detail.Items,
 	}
-	// 公开链接与是否开启无关，是确定的 /s/<表id>
-	if s.cfg.SiteURL != "" {
-		snap.ShareURL = s.cfg.SiteURL + "/s/" + tableID
-	} else {
-		snap.ShareURL = "/s/" + tableID
-	}
+
+	// 站内地址都拼成绝对地址：这些链接会出现在 AI 回复里供用户点击，
+	// 相对路径在别的上下文里可能解析不到站点根。
+	snap.ShareURL = s.siteURL("/s/" + tableID)
+	// 指向导出页与打印页（前端路由）而不是下载接口：下载接口要 Authorization 头，
+	// 链接点击带不上，必须经页面中转。
+	snap.ExportURL = s.siteURL("/tables/" + tableID + "/export")
+	snap.PrintURL = s.siteURL("/tables/" + tableID + "/print")
+
 	if s.shareSvc != nil {
 		if status, err := s.shareSvc.Status(ctx, userID, tableID); err == nil {
 			snap.ShareEnabled = status.Enabled
 		}
 	}
 	return snap
+}
+
+// siteURL 把站内路径拼成绝对地址；未配置 SITE_URL 时退回相对路径（本地开发）。
+func (s *Service) siteURL(path string) string {
+	return s.cfg.SiteURL + path
 }
 
 // Stream 处理一轮对话，并通过 emit 把事件推给调用方（SSE handler）。

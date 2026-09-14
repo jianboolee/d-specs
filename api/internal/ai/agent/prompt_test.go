@@ -87,3 +87,23 @@ func TestBuildSystemPromptShareDisabled(t *testing.T) {
 		}
 	}
 }
+
+// 导出/打印链接与使用规则要下发：模型据此回答「导出」而不自己拼链接
+func TestBuildSystemPromptExportLinks(t *testing.T) {
+	got := BuildSystemPrompt(ops.Snapshot{
+		Title:     "测试表",
+		ExportURL: "https://specs.example.com/tables/abc/export",
+		PrintURL:  "https://specs.example.com/tables/abc/print",
+	})
+
+	for _, part := range []string{
+		"导出链接（Excel，点开即下载）：https://specs.example.com/tables/abc/export",
+		"打印链接（点开为打印预览，可另存为 PDF）：https://specs.example.com/tables/abc/print",
+		"用户想「导出」时",
+		"不要自己拼造或改动",
+	} {
+		if !strings.Contains(got, part) {
+			t.Errorf("system prompt 缺少导出内容 %q\n---\n%s", part, got)
+		}
+	}
+}

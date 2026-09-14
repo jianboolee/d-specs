@@ -88,6 +88,13 @@ type Snapshot struct {
 	// ShareURL 公开分享链接，仅供 prompt 展示（模型据此回答「预览」）。
 	// 它是确定性的 /s/<表id>，与是否开启分享无关。
 	ShareURL string `json:"share_url,omitempty"`
+	// ExportURL 导出页链接（xlsx），仅供 prompt 展示：用户要求导出/下载时，
+	// 模型把它作为 Markdown 链接回复。指向前端路由（/tables/<id>/export），
+	// 不是下载接口本身 —— 下载接口要 Authorization 头，链接点击带不上，
+	// 必须经前端页面中转。
+	ExportURL string `json:"export_url,omitempty"`
+	// PrintURL 打印页链接（可另存为 PDF），同样只供 prompt 展示。
+	PrintURL string `json:"print_url,omitempty"`
 	Items    []Item `json:"items"`
 }
 
@@ -99,6 +106,8 @@ func (s Snapshot) Clone() Snapshot {
 		Pinned:       s.Pinned,
 		ShareEnabled: s.ShareEnabled,
 		ShareURL:     s.ShareURL,
+		ExportURL:    s.ExportURL,
+		PrintURL:     s.PrintURL,
 		Items:        make([]Item, len(s.Items)),
 	}
 	copy(out.Items, s.Items)
