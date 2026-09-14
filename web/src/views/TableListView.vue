@@ -1,40 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 
 import AppSidebar from '@/components/AppSidebar.vue'
+import TableActionsMenu from '@/components/table/TableActionsMenu.vue'
 import { ApiError } from '@/api/http'
 import { useSpecTableStore } from '@/stores/specTable'
 import { useCreateTable } from '@/composables/useCreateTable'
 import type { TableSummary } from '@/types/api'
 import { formatRelativeTime } from '@/utils/time'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 
 const router = useRouter()
 const spec = useSpecTableStore()
@@ -54,68 +30,9 @@ function open(table: TableSummary) {
   void router.push({ name: 'workspace', params: { id: table.id } })
 }
 
-async function duplicate(table: TableSummary) {
-  try {
-    const res = await spec.duplicateTable(table.id, `${table.title} 副本`)
-    toast.success(`已复制为「${res.table.title}」`)
-  } catch (err) {
-    toast.error(describe(err))
-  }
-}
-
-async function togglePin(table: TableSummary) {
-  const next = !table.pinned
-  try {
-    await spec.setPinned(table.id, next)
-    toast.success(next ? '已置顶' : '已取消置顶')
-  } catch (err) {
-    toast.error(describe(err))
-  }
-}
-
-// ---------- 重命名（Dialog + Input） ----------
-
-const renaming = ref<TableSummary | null>(null)
-const renameValue = ref('')
-
-function openRename(table: TableSummary) {
-  renaming.value = table
-  renameValue.value = table.title
-}
-
-async function submitRename() {
-  const table = renaming.value
-  if (!table) return
-  const title = renameValue.value.trim()
-  if (!title || title === table.title) {
-    renaming.value = null
-    return
-  }
-  try {
-    await spec.renameTable(table.id, title)
-    toast.success('已重命名')
-  } catch (err) {
-    toast.error(describe(err))
-  } finally {
-    renaming.value = null
-  }
-}
-
-// ---------- 删除（AlertDialog） ----------
-
-const removing = ref<TableSummary | null>(null)
-
-async function confirmRemove() {
-  const table = removing.value
-  if (!table) return
-  try {
-    await spec.removeTable(table.id)
-    toast.success(`已删除「${table.title}」`)
-  } catch (err) {
-    toast.error(describe(err))
-  } finally {
-    removing.value = null
-  }
+/** 复制完成后跳到副本：通常是为了改几个值做个变体，直接进去更顺手 */
+function goToTable(id: string) {
+  void router.push({ name: 'workspace', params: { id } })
 }
 
 // ---------- 展示 ----------
@@ -167,83 +84,49 @@ function describe(err: unknown) {
             @click="open(table)"
           >
             <div class="card-head">
+              <!-- 已开启分享：小圆点放在标题左侧，与侧栏的公开标识同一视觉语言 -->
+              <span
+                v-if="table.visibility === 'link'"
+                class="share-dot"
+                title="已开启分享"
+              />
               <h3 class="ds-ellipsis">{{ table.title }}</h3>
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
+              <span v-if="table.pinned" class="pin-tag">置顶</span>
+              <TableActionsMenu
+                :table="table"
+                align="end"
+                show-open
+                @open="open(table)"
+                @duplicated="goToTable"
+              >
+                <template #trigger>
                   <button class="more-btn" type="button" title="更多操作" @click.stop>
                     <i class="ri-more-2-fill" />
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem @select="togglePin(table)">
-                    <i :class="table.pinned ? 'ri-unpin-line' : 'ri-pushpin-line'" />
-                    {{ table.pinned ? '取消置顶' : '置顶' }}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @select="open(table)">
-                    <i class="ri-arrow-right-up-line" />
-                    打开
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @select="duplicate(table)">
-                    <i class="ri-file-copy-line" />
-                    复制为新表
-                  </DropdownMenuItem>
-                  <DropdownMenuItem @select="openRename(table)">
-                    <i class="ri-edit-line" />
-                    重命名
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem class="text-destructive" @select="removing = table">
-                    <i class="ri-delete-bin-line" />
-                    删除
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </template>
+              </TableActionsMenu>
             </div>
 
+            <!-- 描述是非必要字段：没有就不占位、不显示「暂无描述」 -->
             <p v-if="table.description" class="card-desc ds-ellipsis">{{ table.description }}</p>
-            <p v-else class="card-desc placeholder">暂无描述</p>
 
             <div class="card-foot">
               <span v-if="table.industry" class="tag">{{ table.industry }}</span>
               <span class="stat">{{ table.item_count }} 个参数</span>
               <span class="dot">·</span>
               <span class="stat">r{{ table.current_revision }}</span>
+
+              <!-- 访问次数只在已分享时有意义；未分享恒为 0，显示出来是噪音 -->
+              <span v-if="table.visibility === 'link'" class="visit-count">
+                {{ table.view_count }} 次访问
+              </span>
+
               <span class="time">{{ formatRelativeTime(table.updated_at) }}</span>
             </div>
           </article>
         </div>
       </div>
     </main>
-
-    <!-- 重命名 -->
-    <Dialog :open="!!renaming" @update:open="(v) => !v && (renaming = null)">
-      <DialogContent class="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle>重命名参数表</DialogTitle>
-        </DialogHeader>
-        <Input v-model="renameValue" maxlength="120" placeholder="产品名称" autofocus @keydown.enter.prevent="submitRename" />
-        <DialogFooter>
-          <Button variant="outline" @click="renaming = null">取消</Button>
-          <Button @click="submitRename">保存</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-
-    <!-- 删除确认 -->
-    <AlertDialog :open="!!removing" @update:open="(v) => !v && (removing = null)">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>删除参数表</AlertDialogTitle>
-          <AlertDialogDescription>
-            确定删除「{{ removing?.title }}」？删除后该表不再出现在列表里。
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel @click="removing = null">取消</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" @click="confirmRemove">删除</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   </div>
 </template>
 
@@ -381,7 +264,7 @@ function describe(err: unknown) {
 
 .card-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
 }
 
@@ -392,6 +275,27 @@ function describe(err: unknown) {
   font-size: var(--ds-font-md);
   font-weight: 600;
   color: var(--ds-text);
+}
+
+/* 已开启分享：标题左侧的 4px 浅绿圆点，与侧栏公开标识同款 */
+.share-dot {
+  flex: none;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ds-share-dot);
+}
+
+/* 置顶：标题右侧的文字标签。用文字而非图钉，状态一眼可读 */
+.pin-tag {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: var(--ds-primary-soft);
+  color: var(--ds-primary);
+  font-size: var(--ds-font-xs);
+  font-weight: 400;
+  line-height: 1.7;
 }
 
 .more-btn {
@@ -417,19 +321,23 @@ function describe(err: unknown) {
   color: var(--ds-text);
 }
 
-.card-desc {
-  margin: 6px 0 14px;
-  font-size: var(--ds-font-xs);
-  color: var(--ds-text-secondary);
-  min-height: 19px;
+/* 触屏没有 hover：菜单入口常驻，否则手机上看不到它 */
+@media (hover: none) {
+  .more-btn {
+    opacity: 1;
+  }
 }
 
-.card-desc.placeholder {
-  color: var(--ds-text-tertiary);
+.card-desc {
+  margin: 6px 0 0;
+  font-size: var(--ds-font-xs);
+  color: var(--ds-text-secondary);
 }
 
 .card-foot {
+  /* 没有描述时也要有最小间距，所以间距放在这里而不是描述的 margin 上 */
   margin-top: auto;
+  padding-top: 14px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -452,6 +360,11 @@ function describe(err: unknown) {
 
 .dot {
   color: var(--ds-border-strong);
+}
+
+/* 已开启分享的访问次数：紧跟 rN 之后 */
+.visit-count {
+  margin-left: 2px;
 }
 
 .time {
