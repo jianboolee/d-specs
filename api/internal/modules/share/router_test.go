@@ -45,6 +45,7 @@ func TestRegisterRoutesDoNotPanic(t *testing.T) {
 		"GET /robots.txt",
 		"GET /api/v1/public/specs",
 		"GET /api/v1/public/specs/:id",
+		"GET /api/v1/public/specs/:id/export",
 	} {
 		if !routes[want] {
 			t.Errorf("缺少路由 %s，实际有：%v", want, routes)

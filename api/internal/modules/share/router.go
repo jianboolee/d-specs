@@ -35,6 +35,8 @@ func Register(engine *gin.Engine, rg *gin.RouterGroup, d *deps.Deps, specSvc *sp
 	rg.GET("/public/specs/:id", h.PublicSpec)
 	// 公开列表 / 搜索：与公开分享同一访问边界，供「发现」页使用
 	rg.GET("/public/specs", h.PublicTableList)
+	// 公开导出 xlsx：边界同上，分享关闭即 404
+	rg.GET("/public/specs/:id/export", h.PublicExport)
 
 	// 分享页 HTML：搜索引擎抓取与链接预览的实际入口
 	engine.GET("/s/:id", h.PublicPage)

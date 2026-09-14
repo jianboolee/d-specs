@@ -36,5 +36,8 @@ func Register(rg *gin.RouterGroup, d *deps.Deps) *Service {
 	tables.GET("/:id/revisions", h.Revisions)
 	tables.POST("/:id/restore", h.Restore)
 
+	// 导出为 xlsx（需登录，只能导出自己的表）
+	tables.GET("/:id/export", h.Export)
+
 	return svc
 }
