@@ -128,12 +128,11 @@ onUnmounted(() => {
           rel="noopener"
         >
           <h3 class="ds-ellipsis">{{ table.title }}</h3>
+          <!-- 描述是非必要字段：没有就不占位、不显示「暂无描述」 -->
           <p v-if="table.description" class="card-desc">{{ table.description }}</p>
-          <p v-else class="card-desc placeholder">暂无描述</p>
 
-          <div class="card-tags">
-            <span v-if="table.industry" class="tag">{{ table.industry }}</span>
-            <span v-for="t in table.tags.slice(0, 3)" :key="t" class="tag muted">{{ t }}</span>
+          <div v-if="table.industry" class="card-tags">
+            <span class="tag">{{ table.industry }}</span>
           </div>
 
           <div class="card-foot">
@@ -295,10 +294,9 @@ onUnmounted(() => {
 }
 
 .card-desc {
-  margin: 6px 0 12px;
+  margin: 6px 0 0;
   font-size: var(--ds-font-xs);
   color: var(--ds-text-secondary);
-  min-height: 19px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -306,15 +304,11 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-.card-desc.placeholder {
-  color: var(--ds-text-tertiary);
-}
-
 .card-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 12px;
+  margin: 12px 0 0;
 }
 
 .tag {
@@ -325,13 +319,10 @@ onUnmounted(() => {
   font-size: var(--ds-font-xs);
 }
 
-.tag.muted {
-  background: var(--ds-surface-muted);
-  color: var(--ds-text-secondary);
-}
-
 .card-foot {
+  /* 没有描述/行业时也要有最小间距，所以间距放在这里而不是上面的 margin 上 */
   margin-top: auto;
+  padding-top: 12px;
   display: flex;
   align-items: center;
   gap: 6px;

@@ -159,12 +159,6 @@ func (p *PageRenderer) bodyBlock(spec *PublicSpec, total int) string {
 	if industry := strings.TrimSpace(spec.Industry); industry != "" {
 		b.WriteString(`<span class="tag">` + html.EscapeString(industry) + `</span>`)
 	}
-	// 产品类型标签（AI 分析写入），排在行业之后
-	for _, tag := range spec.Tags {
-		if t := strings.TrimSpace(tag); t != "" {
-			b.WriteString(`<span class="tag">` + html.EscapeString(t) + `</span>`)
-		}
-	}
 	b.WriteString(`<span>` + strconv.Itoa(total) + ` 个参数</span>`)
 	if s := formatDate(spec.UpdatedAt); s != "" {
 		b.WriteString(`<span class="dot">·</span><span>更新于 ` + s + `</span>`)
