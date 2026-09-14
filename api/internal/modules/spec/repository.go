@@ -53,11 +53,13 @@ func (r *Repository) ListTables(ctx context.Context, userID, keyword string, off
 		return nil, 0, err
 	}
 
-	// 参数项数量用相关子查询一次带出，避免 N+1
+	// 参数项数量与访问次数都用相关子查询一次带出，避免 N+1。
+	// 访问次数取 share_links 的累计值（不筛 enabled）：关闭分享后历史访问仍应可见。
 	var rows []TableSummary
 	err := query.
 		Select("id, title, description, industry, tags, visibility, pinned, current_revision, created_at, updated_at, " +
-			"(SELECT COUNT(*) FROM spec_items WHERE spec_items.table_id = spec_tables.id) AS item_count").
+			"(SELECT COUNT(*) FROM spec_items WHERE spec_items.table_id = spec_tables.id) AS item_count, " +
+			"(SELECT COALESCE(SUM(view_count), 0) FROM share_links WHERE share_links.table_id = spec_tables.id) AS view_count").
 		// 置顶的排最前，其内与其余表一样按最近更新
 		Order("pinned DESC, updated_at DESC").Offset(offset).Limit(limit).
 		Scan(&rows).Error

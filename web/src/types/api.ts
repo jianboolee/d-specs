@@ -70,6 +70,8 @@ export interface TableSummary {
   pinned: boolean
   current_revision: number
   item_count: number
+  /** 公开分享页的累计访问次数；从未开启分享时为 0 */
+  view_count: number
   created_at: string
   updated_at: string
 }

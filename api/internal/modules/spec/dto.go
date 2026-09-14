@@ -45,7 +45,7 @@ type RestoreRequest struct {
 
 // ==================== 响应 ====================
 
-// TableSummary 列表项，带参数项数量
+// TableSummary 列表项，带参数项数量与公开访问次数
 type TableSummary struct {
 	ID              string    `gorm:"column:id" json:"id"`
 	Title           string    `gorm:"column:title" json:"title"`
@@ -56,8 +56,10 @@ type TableSummary struct {
 	Pinned          bool      `gorm:"column:pinned" json:"pinned"`
 	CurrentRevision int       `gorm:"column:current_revision" json:"current_revision"`
 	ItemCount       int       `gorm:"column:item_count" json:"item_count"`
-	CreatedAt       time.Time `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt       time.Time `gorm:"column:updated_at" json:"updated_at"`
+	// ViewCount 公开分享页的累计访问次数。未开启过分享时为 0。
+	ViewCount int64     `gorm:"column:view_count" json:"view_count"`
+	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
 
 type ListResult struct {
