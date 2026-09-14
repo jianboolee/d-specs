@@ -20,13 +20,21 @@ const (
 	// 落库时走元信息路径（不产生 revision），因此不可通过画布撤销。
 	OpSetTableTitle       = "set_table_title"
 	OpSetTableDescription = "set_table_description"
+	// 置顶与分享同样是表级设置：不产生新版本，也不进撤销栈。
+	OpSetTablePinned  = "set_table_pinned"
+	OpSetShareEnabled = "set_share_enabled"
 )
 
 // IsTableOp 判断是否为表级元信息操作。
 //
 // 落库时据此分流：参数 op 走版本化 Apply，表级 op 走元信息更新。
 func IsTableOp(op string) bool {
-	return op == OpSetTableTitle || op == OpSetTableDescription
+	switch op {
+	case OpSetTableTitle, OpSetTableDescription, OpSetTablePinned, OpSetShareEnabled:
+		return true
+	default:
+		return false
+	}
 }
 
 // 参数值类型
@@ -74,12 +82,25 @@ type Snapshot struct {
 	Title string `json:"title"`
 	// Description 表描述。表级 op 需要它来计算变更前后的值。
 	Description string `json:"description"`
-	Items       []Item `json:"items"`
+	// Pinned 与 ShareEnabled 是表级设置：表级 op 需要它们做「无需重复操作」判定。
+	Pinned       bool `json:"pinned"`
+	ShareEnabled bool `json:"share_enabled"`
+	// ShareURL 公开分享链接，仅供 prompt 展示（模型据此回答「预览」）。
+	// 它是确定性的 /s/<表id>，与是否开启分享无关。
+	ShareURL string `json:"share_url,omitempty"`
+	Items    []Item `json:"items"`
 }
 
 // Clone 深拷贝，避免 Apply 过程中污染调用方持有的快照
 func (s Snapshot) Clone() Snapshot {
-	out := Snapshot{Title: s.Title, Description: s.Description, Items: make([]Item, len(s.Items))}
+	out := Snapshot{
+		Title:        s.Title,
+		Description:  s.Description,
+		Pinned:       s.Pinned,
+		ShareEnabled: s.ShareEnabled,
+		ShareURL:     s.ShareURL,
+		Items:        make([]Item, len(s.Items)),
+	}
 	copy(out.Items, s.Items)
 	for i := range out.Items {
 		if s.Items[i].EnumOptions != nil {
@@ -221,6 +242,11 @@ type Op struct {
 	// Title 直接取字符串；Description 用指针以区分「不传」与「传空清空描述」。
 	Title       string  `json:"title,omitempty"`
 	Description *string `json:"description,omitempty"`
+
+	// 表级设置：set_table_pinned / set_share_enabled 使用。
+	// 同样用指针：取消置顶、关闭分享都要传 false，不能让「零值」与「未传」混淆。
+	Pinned       *bool `json:"pinned,omitempty"`
+	ShareEnabled *bool `json:"share_enabled,omitempty"`
 }
 
 // ChangeKind 变更类型

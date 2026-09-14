@@ -93,7 +93,7 @@ func Definitions() []provider.Tool {
 		),
 		provider.NewFunctionTool(
 			ToolProposeOps,
-			"提交对参数表的修改。这是唯一能改动数据的方式，所有变更都必须通过它提交。修改前请先确认目标参数项确实存在（用 get_schema 或 search_items 查过），不要凭猜测填参数名。除参数项外，也可以用 set_table_title / set_table_description 修改整张表的标题与描述——但仅在用户明确要求时这么做，不要主动改。",
+			"提交对参数表的修改。这是唯一能改动数据的方式，所有变更都必须通过它提交。修改前请先确认目标参数项确实存在（用 get_schema 或 search_items 查过），不要凭猜测填参数名。除参数项外，还可以修改整张表的设置：set_table_title（改标题）、set_table_description（改描述）、set_table_pinned（置顶/取消置顶）、set_share_enabled（开启/关闭公开分享）——这些都只在用户明确要求时做，不要主动改。",
 			objectSchema(map[string]any{
 				"summary": map[string]any{
 					"type":        "string",
@@ -119,8 +119,9 @@ func opSchema() map[string]any {
 					ops.OpAddItem, ops.OpAddItems, ops.OpUpdateItem,
 					ops.OpDeleteItem, ops.OpReorderItems, ops.OpSetGroup,
 					ops.OpSetTableTitle, ops.OpSetTableDescription,
+					ops.OpSetTablePinned, ops.OpSetShareEnabled,
 				},
-				"description": "操作类型。add_item=新增一条；add_items=批量新增；update_item=修改；delete_item=删除；reorder_items=调整顺序；set_group=调整分组；set_table_title=修改整张表的标题；set_table_description=修改整张表的描述",
+				"description": "操作类型。add_item=新增一条；add_items=批量新增；update_item=修改；delete_item=删除；reorder_items=调整顺序；set_group=调整分组；set_table_title=修改整张表的标题；set_table_description=修改整张表的描述；set_table_pinned=置顶或取消置顶；set_share_enabled=开启或关闭公开分享",
 			},
 			"item_id": map[string]any{
 				"type":        "string",
@@ -184,6 +185,14 @@ func opSchema() map[string]any {
 			"description": map[string]any{
 				"type":        "string",
 				"description": "set_table_description 使用：整张参数表的新描述（一两句话概括这个产品）。仅在用户明确要求补充或修改描述时填写；传空字符串表示清空",
+			},
+			"pinned": map[string]any{
+				"type":        "boolean",
+				"description": "set_table_pinned 使用：true=置顶，false=取消置顶。仅在用户明确要求时填写",
+			},
+			"share_enabled": map[string]any{
+				"type":        "boolean",
+				"description": "set_share_enabled 使用：true=开启公开分享，false=关闭分享（关闭后已发出的链接立即失效）。仅在用户明确要求时填写",
 			},
 		},
 		"required": []string{"op"},

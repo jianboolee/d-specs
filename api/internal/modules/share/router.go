@@ -14,7 +14,10 @@ import (
 //
 // engine 用于挂载根路径下的公开页面（/s/:id 等）。它们不能放在 /api/v1 下：
 // 搜索引擎收录的是面向人类的 /s/<id>，而不是带 /api 前缀的接口地址。
-func Register(engine *gin.Engine, rg *gin.RouterGroup, d *deps.Deps, specSvc *spec.Service) {
+//
+// 返回 svc 供 chat 模块复用：AI 的开启/关闭分享必须与手工操作走同一套实现，
+// 否则两边的分享边界会各走一套。
+func Register(engine *gin.Engine, rg *gin.RouterGroup, d *deps.Deps, specSvc *spec.Service) *Service {
 	repo := NewRepository(d.DB)
 	svc := NewService(repo, specSvc)
 	page := NewPageRenderer(d.Config.WebDistDir, d.Config.SiteName, d.Config.SiteURL)
@@ -37,4 +40,6 @@ func Register(engine *gin.Engine, rg *gin.RouterGroup, d *deps.Deps, specSvc *sp
 	engine.GET("/s/:id", h.PublicPage)
 	engine.GET("/sitemap.xml", h.Sitemap)
 	engine.GET("/robots.txt", h.Robots)
+
+	return svc
 }

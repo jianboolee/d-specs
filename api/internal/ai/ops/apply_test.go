@@ -699,8 +699,107 @@ func TestTableOpsMixedWithItemOps(t *testing.T) {
 	}
 }
 
+func TestSetTablePinned(t *testing.T) {
+	t.Run("置顶成功并记录前后值", func(t *testing.T) {
+		base := snapshot()
+		yes := true
+		next, changes, err := Apply(base, []Op{{Op: OpSetTablePinned, Pinned: &yes}})
+		if err != nil {
+			t.Fatalf("不应报错: %v", err)
+		}
+		if !next.Pinned {
+			t.Fatal("置顶未生效")
+		}
+		if len(changes) != 1 || changes[0].Name != "置顶" ||
+			changes[0].OldValue != "否" || changes[0].NewValue != "是" {
+			t.Fatalf("变更前后值不对: %+v", changes)
+		}
+	})
+
+	t.Run("取消置顶", func(t *testing.T) {
+		base := snapshot()
+		base.Pinned = true
+		no := false
+		next, changes, err := Apply(base, []Op{{Op: OpSetTablePinned, Pinned: &no}})
+		if err != nil {
+			t.Fatalf("不应报错: %v", err)
+		}
+		if next.Pinned {
+			t.Fatal("取消置顶未生效")
+		}
+		if changes[0].OldValue != "是" || changes[0].NewValue != "否" {
+			t.Fatalf("变更前后值不对: %+v", changes[0])
+		}
+	})
+
+	t.Run("缺少 pinned 字段被拒绝", func(t *testing.T) {
+		if _, _, err := Apply(snapshot(), []Op{{Op: OpSetTablePinned}}); err == nil {
+			t.Fatal("缺少 pinned 应报错")
+		}
+	})
+
+	t.Run("重复置顶被拒绝", func(t *testing.T) {
+		base := snapshot()
+		base.Pinned = true
+		yes := true
+		if _, _, err := Apply(base, []Op{{Op: OpSetTablePinned, Pinned: &yes}}); err == nil {
+			t.Fatal("已是置顶状态应报错")
+		}
+	})
+}
+
+func TestSetShareEnabled(t *testing.T) {
+	t.Run("开启分享成功并记录前后值", func(t *testing.T) {
+		yes := true
+		next, changes, err := Apply(snapshot(), []Op{{Op: OpSetShareEnabled, ShareEnabled: &yes}})
+		if err != nil {
+			t.Fatalf("不应报错: %v", err)
+		}
+		if !next.ShareEnabled {
+			t.Fatal("开启分享未生效")
+		}
+		if len(changes) != 1 || changes[0].Name != "分享" ||
+			changes[0].OldValue != "已关闭" || changes[0].NewValue != "已开启" {
+			t.Fatalf("变更前后值不对: %+v", changes)
+		}
+	})
+
+	t.Run("关闭分享", func(t *testing.T) {
+		base := snapshot()
+		base.ShareEnabled = true
+		no := false
+		next, changes, err := Apply(base, []Op{{Op: OpSetShareEnabled, ShareEnabled: &no}})
+		if err != nil {
+			t.Fatalf("不应报错: %v", err)
+		}
+		if next.ShareEnabled {
+			t.Fatal("关闭分享未生效")
+		}
+		if changes[0].OldValue != "已开启" || changes[0].NewValue != "已关闭" {
+			t.Fatalf("变更前后值不对: %+v", changes[0])
+		}
+	})
+
+	t.Run("缺少 share_enabled 字段被拒绝", func(t *testing.T) {
+		if _, _, err := Apply(snapshot(), []Op{{Op: OpSetShareEnabled}}); err == nil {
+			t.Fatal("缺少 share_enabled 应报错")
+		}
+	})
+
+	t.Run("重复开启被拒绝", func(t *testing.T) {
+		base := snapshot()
+		base.ShareEnabled = true
+		yes := true
+		if _, _, err := Apply(base, []Op{{Op: OpSetShareEnabled, ShareEnabled: &yes}}); err == nil {
+			t.Fatal("已开启分享应报错")
+		}
+	})
+}
+
 func TestIsTableOp(t *testing.T) {
-	for _, op := range []string{OpSetTableTitle, OpSetTableDescription} {
+	for _, op := range []string{
+		OpSetTableTitle, OpSetTableDescription, OpSetTablePinned, OpSetShareEnabled,
+	} {
 		if !IsTableOp(op) {
 			t.Errorf("%s 应判定为表级操作", op)
 		}
@@ -709,5 +808,27 @@ func TestIsTableOp(t *testing.T) {
 		if IsTableOp(op) {
 			t.Errorf("%s 不应判定为表级操作", op)
 		}
+	}
+}
+
+// 置顶与分享可以和参数 op 混在一批里一起生效。
+func TestTableSettingsMixedWithItemOps(t *testing.T) {
+	yes := true
+	next, changes, err := Apply(snapshot(), []Op{
+		{Op: OpSetTablePinned, Pinned: &yes},
+		{Op: OpAddItem, Item: &Draft{Name: "新增项", Value: "1", ValueType: TypeNumber}},
+		{Op: OpSetShareEnabled, ShareEnabled: &yes},
+	})
+	if err != nil {
+		t.Fatalf("不应报错: %v", err)
+	}
+	if !next.Pinned || !next.ShareEnabled {
+		t.Fatalf("表级设置未生效: pinned=%v share=%v", next.Pinned, next.ShareEnabled)
+	}
+	if len(next.Items) != len(snapshot().Items)+1 {
+		t.Fatalf("参数项未新增，实际 %d 项", len(next.Items))
+	}
+	if len(changes) != 3 {
+		t.Fatalf("应有 3 条变更，实际 %d: %+v", len(changes), changes)
 	}
 }

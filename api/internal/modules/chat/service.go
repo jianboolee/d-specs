@@ -13,6 +13,7 @@ import (
 	"github.com/jianboolee/d-specs/internal/ai/provider"
 	"github.com/jianboolee/d-specs/internal/config"
 	"github.com/jianboolee/d-specs/internal/modules/analysis"
+	"github.com/jianboolee/d-specs/internal/modules/share"
 	"github.com/jianboolee/d-specs/internal/modules/spec"
 )
 
@@ -30,16 +31,18 @@ type Service struct {
 	repo        *Repository
 	specSvc     *spec.Service
 	analysisSvc *analysis.Service
+	shareSvc    *share.Service
 	followups   *followups.Generator
 	llm         provider.Provider
 	cfg         *config.Config
 }
 
-func NewService(repo *Repository, specSvc *spec.Service, analysisSvc *analysis.Service, llm provider.Provider, cfg *config.Config) *Service {
+func NewService(repo *Repository, specSvc *spec.Service, analysisSvc *analysis.Service, shareSvc *share.Service, llm provider.Provider, cfg *config.Config) *Service {
 	return &Service{
 		repo:        repo,
 		specSvc:     specSvc,
 		analysisSvc: analysisSvc,
+		shareSvc:    shareSvc,
 		followups:   followups.New(llm),
 		llm:         llm,
 		cfg:         cfg,
@@ -61,6 +64,34 @@ func (s *Service) Prepare(ctx context.Context, userID, tableID, message string) 
 	}
 	_, err := s.specSvc.Detail(ctx, userID, tableID)
 	return err
+}
+
+// tableSnapshot 组装给模型看的表状态。
+//
+// 除标题/描述/参数项外，还带上置顶与分享状态、公开链接：模型回答「预览」
+// 需要链接，判断「是否已置顶/已分享」也需要这两个状态做 no-op 判定。
+//
+// 分享状态读失败时降级为「未开启」而不是整轮报错：分享只是附加信息，
+// 不该因为它读不到就让用户连参数都改不了。
+func (s *Service) tableSnapshot(ctx context.Context, userID, tableID string, detail *spec.DetailResult) ops.Snapshot {
+	snap := ops.Snapshot{
+		Title:       detail.Table.Title,
+		Description: detail.Table.Description,
+		Pinned:      detail.Table.Pinned,
+		Items:       detail.Items,
+	}
+	// 公开链接与是否开启无关，是确定的 /s/<表id>
+	if s.cfg.SiteURL != "" {
+		snap.ShareURL = s.cfg.SiteURL + "/s/" + tableID
+	} else {
+		snap.ShareURL = "/s/" + tableID
+	}
+	if s.shareSvc != nil {
+		if status, err := s.shareSvc.Status(ctx, userID, tableID); err == nil {
+			snap.ShareEnabled = status.Enabled
+		}
+	}
+	return snap
 }
 
 // Stream 处理一轮对话，并通过 emit 把事件推给调用方（SSE handler）。
@@ -125,11 +156,7 @@ func (s *Service) Stream(ctx context.Context, userID, tableID string, req SendRe
 
 	// agent 的 emit 回调没有返回值，客户端断开的信号先记下来，Run 结束后统一处理
 	var emitErr error
-	res, runErr := ag.Run(ctx, history, ops.Snapshot{
-		Title:       detail.Table.Title,
-		Description: detail.Table.Description,
-		Items:       detail.Items,
-	}, func(ev agent.Event) {
+	res, runErr := ag.Run(ctx, history, s.tableSnapshot(ctx, userID, tableID, detail), func(ev agent.Event) {
 		if emitErr != nil {
 			return
 		}
@@ -330,11 +357,7 @@ func (s *Service) applyOps(
 		return ops.Snapshot{}, nil, revision, err
 	}
 
-	return ops.Snapshot{
-		Title:       detail.Table.Title,
-		Description: detail.Table.Description,
-		Items:       detail.Items,
-	}, changes, revision, nil
+	return s.tableSnapshot(ctx, userID, tableID, detail), changes, revision, nil
 }
 
 // applySplitOps 先应用参数项 op（版本化），再应用表级 op（元信息）。
@@ -380,21 +403,30 @@ func (s *Service) applySplitOps(
 	return revision, changes, nil
 }
 
-// applyTableOps 应用表级元信息 op（标题/描述）。
+// applyTableOps 应用表级 op（标题/描述/置顶/分享）。
 //
-// 复用 ops.Apply 做校验与变更预览：传一份最小快照即可，只取其中的表级变更。
+// 复用 ops.Apply 做校验与变更预览：传一份最小的表状态快照，只取其中的表级变更。
+//
+// 落库分两条路：标题/描述走 spec 元信息；分享走 share 服务。
+// 置顶也走 spec 元信息（它只是 spec_tables 上的一个字段）。
 func (s *Service) applyTableOps(
 	ctx context.Context,
 	userID, tableID string,
 	table spec.TableDetail,
 	tableOps []ops.Op,
 ) ([]ops.Change, error) {
-	base := ops.Snapshot{Title: table.Title, Description: table.Description}
+	base := ops.Snapshot{
+		Title:        table.Title,
+		Description:  table.Description,
+		Pinned:       table.Pinned,
+		ShareEnabled: table.Visibility == spec.VisibilityLink,
+	}
 	_, changes, err := ops.Apply(base, tableOps)
 	if err != nil {
 		return nil, err
 	}
 
+	// 标题/描述/置顶都落在 spec 的元信息上，合成一次更新
 	patch := spec.UpdateRequest{}
 	for _, c := range changes {
 		text := c.NewValue
@@ -405,10 +437,37 @@ func (s *Service) applyTableOps(
 			patch.Description = &text
 		}
 	}
-
-	if _, err := s.specSvc.UpdateMeta(ctx, userID, tableID, patch); err != nil {
-		return nil, err
+	// 置顶从 op 字段取值：Change 里的「是/否」是给人看的，不便于回填布尔
+	for _, op := range tableOps {
+		if op.Op == ops.OpSetTablePinned && op.Pinned != nil {
+			patch.Pinned = op.Pinned
+		}
 	}
+	if patch.Title != nil || patch.Description != nil || patch.Pinned != nil {
+		if _, err := s.specSvc.UpdateMeta(ctx, userID, tableID, patch); err != nil {
+			return nil, err
+		}
+	}
+
+	// 分享是独立模块的状态，需单独开关
+	for _, op := range tableOps {
+		if op.Op != ops.OpSetShareEnabled || op.ShareEnabled == nil {
+			continue
+		}
+		if s.shareSvc == nil {
+			return nil, errors.New("分享功能不可用")
+		}
+		if *op.ShareEnabled {
+			if _, err := s.shareSvc.Enable(ctx, userID, tableID); err != nil {
+				return nil, err
+			}
+		} else {
+			if _, err := s.shareSvc.Disable(ctx, userID, tableID); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return changes, nil
 }
 

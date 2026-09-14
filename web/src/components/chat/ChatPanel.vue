@@ -111,13 +111,18 @@ function hasChanges(msg: ChatMessage) {
 }
 
 /**
- * 是否包含表级改动（标题/描述）。
+ * 是否包含表级改动（标题/描述/置顶/分享）。
  *
  * 这类改动走元信息路径、不产生版本，撤销按钮回退不了它们，
  * 所以含表级改动时不给「撤销」，并在卡片上说明。
  */
 function hasTableChange(msg: ChatMessage) {
   return (msg.changes ?? []).some((c) => c.kind === 'table')
+}
+
+/** 是否改动了参数项。只有参数项改动才推进版本号，才该显示 rN */
+function hasItemChange(msg: ChatMessage) {
+  return (msg.changes ?? []).some((c) => c.kind !== 'table')
 }
 
 function kindLabel(kind: ChatChange['kind']) {
@@ -129,7 +134,7 @@ function kindLabel(kind: ChatChange['kind']) {
     case 'delete':
       return '删除'
     case 'table':
-      return '表'
+      return '表设置'
     default:
       return '移动'
   }
@@ -172,7 +177,10 @@ function kindLabel(kind: ChatChange['kind']) {
               <span v-if="msg.undone">已撤销这次改动</span>
               <span v-else>
                 已修改 {{ msg.changes!.length }} 处
-                <template v-if="msg.appliedRevision">· r{{ msg.appliedRevision }}</template>
+                <!-- 只有参数项改动会推进版本号：纯置顶/分享的一轮不该显示 rN -->
+                <template v-if="hasItemChange(msg) && msg.appliedRevision">
+                  · r{{ msg.appliedRevision }}
+                </template>
               </span>
               <!-- 表级改动不产生版本，撤销回退不了，因此不提供撤销按钮 -->
               <button
@@ -205,7 +213,7 @@ function kindLabel(kind: ChatChange['kind']) {
             </ul>
 
             <p v-if="hasTableChange(msg) && !msg.undone" class="changes-note">
-              表信息（标题/描述）不进入版本历史，无法在这里撤销
+              表级设置（标题/描述/置顶/分享）不进入版本历史，无法在这里撤销
             </p>
           </div>
 

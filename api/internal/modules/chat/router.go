@@ -4,6 +4,7 @@ import (
 	"github.com/jianboolee/d-specs/internal/deps"
 	"github.com/jianboolee/d-specs/internal/middleware"
 	"github.com/jianboolee/d-specs/internal/modules/analysis"
+	"github.com/jianboolee/d-specs/internal/modules/share"
 	"github.com/jianboolee/d-specs/internal/modules/spec"
 
 	"github.com/gin-gonic/gin"
@@ -14,9 +15,10 @@ import (
 // specSvc 由调用方传入而不是在这里另建一个：AI 变更与手工变更必须共用
 // 同一个 spec.Service，否则两边的校验与版本语义会各走一套。
 // analysisSvc 同理：对话里的「完善参数表」直接复用分析能力。
-func Register(rg *gin.RouterGroup, d *deps.Deps, specSvc *spec.Service, analysisSvc *analysis.Service) {
+// shareSvc 也同理：对话里的「开启/关闭分享」要与手工分享共用同一套边界。
+func Register(rg *gin.RouterGroup, d *deps.Deps, specSvc *spec.Service, analysisSvc *analysis.Service, shareSvc *share.Service) {
 	repo := NewRepository(d.DB)
-	svc := NewService(repo, specSvc, analysisSvc, d.LLM, d.Config)
+	svc := NewService(repo, specSvc, analysisSvc, shareSvc, d.LLM, d.Config)
 	h := NewHandler(svc)
 
 	authed := rg.Group("")

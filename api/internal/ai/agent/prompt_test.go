@@ -51,3 +51,39 @@ func TestBuildSystemPromptHasBaselineRules(t *testing.T) {
 		}
 	}
 }
+
+// 置顶/分享/预览的规则与状态都要下发，否则模型不知道能做这些事
+func TestBuildSystemPromptTableSettings(t *testing.T) {
+	got := BuildSystemPrompt(ops.Snapshot{
+		Title:        "测试表",
+		Pinned:       true,
+		ShareEnabled: true,
+		ShareURL:     "https://specs.example.com/s/abc",
+	})
+
+	for _, part := range []string{
+		"set_table_pinned",
+		"set_share_enabled",
+		"置顶状态：已置顶",
+		"分享状态：已开启",
+		"https://specs.example.com/s/abc",
+		"未开启分享时不要给出链接",
+	} {
+		if !strings.Contains(got, part) {
+			t.Errorf("system prompt 缺少表设置内容 %q\n---\n%s", part, got)
+		}
+	}
+}
+
+// 未开启分享时要明确标注链接当前不可访问，避免模型把它当有效地址发出去
+func TestBuildSystemPromptShareDisabled(t *testing.T) {
+	got := BuildSystemPrompt(ops.Snapshot{
+		Title:    "测试表",
+		ShareURL: "https://specs.example.com/s/abc",
+	})
+	for _, part := range []string{"置顶状态：未置顶", "分享状态：未开启", "此链接当前无法访问"} {
+		if !strings.Contains(got, part) {
+			t.Errorf("system prompt 缺少 %q\n---\n%s", part, got)
+		}
+	}
+}

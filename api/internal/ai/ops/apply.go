@@ -53,7 +53,7 @@ func Validate(s Snapshot, operations []Op) []error {
 
 var knownOps = []string{
 	OpAddItem, OpAddItems, OpUpdateItem, OpDeleteItem, OpReorderItems, OpSetGroup,
-	OpSetTableTitle, OpSetTableDescription,
+	OpSetTableTitle, OpSetTableDescription, OpSetTablePinned, OpSetShareEnabled,
 }
 
 // 表级元信息的上限，与 spec 模块 DTO 的 binding 保持一致
@@ -103,6 +103,10 @@ func applyOne(s *Snapshot, op Op, label string) ([]Change, []error) {
 		return applySetTableTitle(s, op, label)
 	case OpSetTableDescription:
 		return applySetTableDescription(s, op, label)
+	case OpSetTablePinned:
+		return applySetTablePinned(s, op, label)
+	case OpSetShareEnabled:
+		return applySetShareEnabled(s, op, label)
 	default:
 		return nil, []error{fmt.Errorf("%s：未知操作类型 %q（可用：%s）", label, op.Op, strings.Join(knownOps, "、"))}
 	}
@@ -157,6 +161,70 @@ func applySetTableDescription(s *Snapshot, op Op, label string) ([]Change, []err
 		OldValue: old,
 		NewValue: desc,
 	}}, nil
+}
+
+// applySetTablePinned 置顶 / 取消置顶。
+//
+// 与标题、描述一样只改 Snapshot，落库走元信息路径：置顶是用户级偏好，
+// 不产生 revision，因此也没有「撤销」可回退。
+func applySetTablePinned(s *Snapshot, op Op, label string) ([]Change, []error) {
+	if op.Pinned == nil {
+		return nil, []error{fmt.Errorf("%s：缺少 pinned 字段", label)}
+	}
+	if *op.Pinned == s.Pinned {
+		if *op.Pinned {
+			return nil, []error{fmt.Errorf("%s：这张表已经是置顶状态，无需重复操作", label)}
+		}
+		return nil, []error{fmt.Errorf("%s：这张表当前未置顶，无需取消", label)}
+	}
+
+	old := yesNo(s.Pinned)
+	s.Pinned = *op.Pinned
+	return []Change{{
+		Kind:     ChangeTable,
+		Name:     "置顶",
+		OldValue: old,
+		NewValue: yesNo(s.Pinned),
+	}}, nil
+}
+
+// applySetShareEnabled 开启 / 关闭公开分享。
+//
+// 关闭分享会让已发出的链接立即失效，但重新开启会复用同一个链接
+// （公开地址是 /s/<表id>，不是一次性 token），因此这里不做二次确认。
+func applySetShareEnabled(s *Snapshot, op Op, label string) ([]Change, []error) {
+	if op.ShareEnabled == nil {
+		return nil, []error{fmt.Errorf("%s：缺少 share_enabled 字段", label)}
+	}
+	if *op.ShareEnabled == s.ShareEnabled {
+		if *op.ShareEnabled {
+			return nil, []error{fmt.Errorf("%s：这张表已经开启分享，无需重复操作", label)}
+		}
+		return nil, []error{fmt.Errorf("%s：这张表当前未开启分享，无需关闭", label)}
+	}
+
+	old := enabledText(s.ShareEnabled)
+	s.ShareEnabled = *op.ShareEnabled
+	return []Change{{
+		Kind:     ChangeTable,
+		Name:     "分享",
+		OldValue: old,
+		NewValue: enabledText(s.ShareEnabled),
+	}}, nil
+}
+
+func yesNo(v bool) string {
+	if v {
+		return "是"
+	}
+	return "否"
+}
+
+func enabledText(v bool) string {
+	if v {
+		return "已开启"
+	}
+	return "已关闭"
 }
 
 // ==================== add ====================

@@ -68,8 +68,9 @@ func Setup(engine *gin.Engine, d *deps.Deps) {
 	// 分析复用 specSvc：标签落库要和手工/对话变更走同一套写路径。
 	// 分析不再单独暴露 HTTP 端点，而是作为对话里的一轮「完善参数表」。
 	analysisSvc := analysis.NewService(specSvc, d.LLM, d.Config)
-	chat.Register(v1, d, specSvc, analysisSvc)
 	// engine 也要传进去：分享页 /s/:id 与 sitemap / robots 挂在根路径，
-	// 而不是 /api/v1 下
-	share.Register(engine, v1, d, specSvc)
+	// 而不是 /api/v1 下。
+	// shareSvc 再传给 chat：对话里的「开启/关闭分享」必须与手工操作同一套实现。
+	shareSvc := share.Register(engine, v1, d, specSvc)
+	chat.Register(v1, d, specSvc, analysisSvc, shareSvc)
 }

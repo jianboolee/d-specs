@@ -91,6 +91,21 @@ async function onShareChanged() {
   void spec.loadTables()
 }
 
+/**
+ * 分享状态跟着表一起刷新。
+ *
+ * 除了菜单，AI 也能在对话里开关分享（syncCanvas 会 refreshItems 把
+ * visibility 带回来），标题旁那个绿点读的却是本页的 shareStatus，
+ * 不跟着同步的话 AI 开启分享后绿点不会亮。
+ */
+watch(
+  () => spec.table?.visibility,
+  (next, prev) => {
+    if (next === prev) return
+    void loadShareStatus()
+  },
+)
+
 // ---------- 操作后的去向 ----------
 
 /** 复制完成后跳到副本：通常是为了改几个值做个变体，直接进去更顺手 */

@@ -28,8 +28,11 @@ func TestRegisterRoutesDoNotPanic(t *testing.T) {
 	}
 	specSvc := spec.NewService(spec.NewRepository(nil))
 
-	// 出错会以 panic 形式暴露
-	Register(engine, v1, d, specSvc)
+	// 出错会以 panic 形式暴露；返回值供 chat 模块复用（对话里开关分享）
+	svc := Register(engine, v1, d, specSvc)
+	if svc == nil {
+		t.Fatal("Register 应返回 share.Service 供 chat 复用")
+	}
 
 	routes := map[string]bool{}
 	for _, r := range engine.Routes() {
