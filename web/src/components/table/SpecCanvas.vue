@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import type { SpecItem } from '@/types/api'
 import { useCanvas } from '@/composables/useCanvas'
@@ -13,6 +13,8 @@ import {
 const props = withDefaults(
   defineProps<{
     items: SpecItem[]
+    /** 表名。手机上画布是全屏覆盖层，会盖住对话区的标题，所以这里也要显示一份 */
+    title?: string
     /** 表简介，有内容时展示在参数列表上方 */
     description?: string
     highlightIds?: string[]
@@ -23,6 +25,7 @@ const props = withDefaults(
     readonly?: boolean
   }>(),
   {
+    title: '',
     description: '',
     highlightIds: () => [],
     revision: 0,
@@ -39,6 +42,8 @@ const emit = defineEmits<{
     draft: { name: string; value: string; group_name: string; value_type: 'text' | 'number' },
   ]
   'remove-item': [itemId: string, name: string]
+  /** 表名/描述的元信息修改（就地编辑标题与描述） */
+  'update-meta': [patch: { title?: string; description?: string }]
   share: []
   undo: []
   redo: []
@@ -130,6 +135,66 @@ function confirmAdd() {
 function isHighlighted(id: string) {
   return props.highlightIds.includes(id)
 }
+
+// ---------- 表名 / 描述的就地编辑 ----------
+
+const descRef = ref<HTMLTextAreaElement | null>(null)
+
+/**
+ * 描述框随内容自适应高度。
+ *
+ * 先置 auto 再读 scrollHeight：不这样，收缩（删行）时高度只会停在最大值。
+ * 两次写在同一帧内，不会看到中间态。
+ */
+function resizeDesc() {
+  const el = descRef.value
+  if (!el) return
+  // 画布收起时宽度为 0（桌面收起态），此时按 0 宽度量出来的高度会失真，跳过
+  if (el.offsetWidth === 0) return
+  el.style.height = 'auto'
+  el.style.height = `${el.scrollHeight}px`
+}
+
+/**
+ * 收起/展开是宽度动画，动画途中量高度同样会失真。
+ * 等宽度过渡真正结束、宽度落到最终值后再量一次。
+ */
+function onCanvasTransitionEnd(event: TransitionEvent) {
+  if (event.propertyName === 'width') resizeDesc()
+}
+
+// 描述由外部变化（打开表、AI 改过）或画布可见性变化时，同步高度
+watch([() => props.description, hidden], async () => {
+  await nextTick()
+  resizeDesc()
+})
+
+onMounted(() => resizeDesc())
+
+/** 标题必填：清空视为放弃本次编辑，回退成原值 */
+function commitTitle(event: Event) {
+  const el = event.target as HTMLInputElement
+  const next = el.value.trim()
+  if (next === props.title) {
+    el.value = props.title
+    return
+  }
+  if (!next) {
+    el.value = props.title
+    return
+  }
+  emit('update-meta', { title: next })
+}
+
+/** 描述可以留空。立刻把输入归一化，免得页面里留下多余空白 */
+function commitDescription(event: Event) {
+  const el = event.target as HTMLTextAreaElement
+  const next = el.value.trim()
+  el.value = next
+  resizeDesc()
+  if (next === props.description) return
+  emit('update-meta', { description: next })
+}
 </script>
 
 <template>
@@ -143,6 +208,7 @@ function isHighlighted(id: string) {
     class="canvas"
     :class="{ collapsed: collapsed && !isMobile, 'mobile-open': canvasOpen }"
     :inert="hidden"
+    @transitionend="onCanvasTransitionEnd"
   >
     <header class="canvas-head">
       <div class="canvas-head-left">
@@ -236,8 +302,29 @@ function isHighlighted(id: string) {
     </header>
 
     <div class="canvas-body ds-scroll-y">
-      <!-- 表简介：从头部挪到正文，空间更宽裕，长描述也能完整读到 -->
-      <p v-if="description" class="canvas-desc">{{ description }}</p>
+      <!-- 表名与描述都可以就地修改，和参数单元格一样直接改、失焦提交。
+           两者都常驻 1px 透明边框，focus 只换颜色，盒子尺寸不变，聚焦时不跳动 -->
+      <input
+        class="canvas-title"
+        :value="title"
+        :readonly="readonly"
+        placeholder="未命名参数表"
+        aria-label="参数表名称"
+        @change="commitTitle"
+        @keydown.enter="($event.target as HTMLInputElement).blur()"
+      />
+
+      <textarea
+        ref="descRef"
+        class="canvas-desc"
+        :value="description"
+        :readonly="readonly"
+        rows="1"
+        placeholder="添加描述，说明这张表是做什么的"
+        aria-label="参数表描述"
+        @input="resizeDesc"
+        @change="commitDescription"
+      />
 
       <div v-if="items.length === 0 && addingGroup === null" class="canvas-empty">
         <i class="ri-table-line" />
@@ -481,17 +568,74 @@ function isHighlighted(id: string) {
   padding: 16px 18px 28px;
 }
 
-/* 表简介：浅底块，与参数表内容区分开 */
+/* 表名：正文里的标题，可直接编辑。比描述略大、比对话区标题克制 */
+.canvas-title {
+  display: block;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 3px 7px;
+  /* 边框常驻（透明），focus 只换颜色：不改变盒模型，聚焦时不闪动 */
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ds-text);
+  font-family: inherit;
+  font-size: var(--ds-font-base);
+  font-weight: 600;
+  line-height: 1.4;
+  outline: none;
+}
+
+.canvas-title:hover:not([readonly]) {
+  border-color: var(--ds-border-strong);
+}
+
+.canvas-title:focus {
+  border-color: var(--ds-primary);
+  background: var(--ds-surface);
+}
+
+.canvas-title::placeholder {
+  color: var(--ds-text-tertiary);
+  font-weight: 400;
+}
+
+/* 表简介：浅底块，与参数表内容区分开。同样就地可改。
+   由 JS 按内容撑高，所以固定 resize:none、不设 height */
 .canvas-desc {
+  display: block;
+  width: 100%;
   margin: 0 0 16px;
-  padding: 10px 12px;
+  padding: 9px 11px;
+  border: 1px solid transparent;
   border-radius: 10px;
   background: var(--ds-surface-muted);
   color: var(--ds-text-secondary);
+  font-family: inherit;
   font-size: var(--ds-font-xs);
   line-height: 1.7;
+  resize: none;
+  /* 保留换行；长串（如没有空格的型号）也要在框内折行，不横向溢出 */
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+  /* 描述再长也不该把参数表顶到屏幕外，超出后内部滚动 */
+  max-height: 220px;
+  outline: none;
+}
+
+.canvas-desc:hover:not([readonly]) {
+  border-color: var(--ds-border-strong);
+}
+
+.canvas-desc:focus {
+  border-color: var(--ds-primary);
+  background: var(--ds-surface);
+  color: var(--ds-text);
+}
+
+.canvas-desc::placeholder {
+  color: var(--ds-text-tertiary);
 }
 
 .canvas-empty {
