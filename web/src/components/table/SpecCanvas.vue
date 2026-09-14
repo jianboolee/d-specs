@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import type { SpecItem } from '@/types/api'
+import { displayGroups as displayGroupsOf } from '@/utils/specGroups'
 import { useCanvas } from '@/composables/useCanvas'
 import { useIsMobile, useMobileShell } from '@/composables/useMobileShell'
 import {
@@ -58,31 +59,8 @@ const { canvasOpen, closeCanvas } = useMobileShell()
 // 对外「看不见」的统一判断：手机看覆盖层，桌面看收起态
 const hidden = computed(() => (isMobile.value ? !canvasOpen.value : collapsed.value))
 
-interface ItemGroup {
-  name: string
-  items: SpecItem[]
-}
-
-const groups = computed<ItemGroup[]>(() => {
-  const map = new Map<string, SpecItem[]>()
-  for (const item of props.items) {
-    const key = item.group_name || ''
-    const list = map.get(key)
-    if (list) list.push(item)
-    else map.set(key, [item])
-  }
-  return [...map.entries()].map(([name, list]) => ({ name, items: list }))
-})
-
-/**
- * 空表时补一个「未分组」占位分组。
- *
- * 这样「添加参数」按钮与新增行表单只有一条渲染路径，
- * 不必为「表里一个分组都还没有」再写一套重复的模板。
- */
-const displayGroups = computed<ItemGroup[]>(() =>
-  groups.value.length > 0 ? groups.value : [{ name: '', items: [] }],
-)
+// 分组规则与打印文档共用一份实现（utils/specGroups.ts）
+const displayGroups = computed(() => displayGroupsOf(props.items))
 
 // ---------- 行内编辑 ----------
 

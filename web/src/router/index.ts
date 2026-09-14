@@ -37,6 +37,20 @@ const router = createRouter({
       component: () => import('@/views/WorkspaceView.vue'),
     },
     {
+      // 打印页：独立页面渲染整张表并自动唤起打印，供「导出 PDF」用。
+      // 需要登录（未登录会跳登录），打开方式是新标签页。
+      path: '/tables/:id/print',
+      name: 'print',
+      component: () => import('@/views/PrintView.vue'),
+    },
+    {
+      // 导出页：独立页面触发 xlsx 下载，供「导出 Excel」与 AI 回复里的链接用。
+      // 单独成页才能被链接点击（下载接口要 Authorization 头，直接链接口会 401）。
+      path: '/tables/:id/export',
+      name: 'export',
+      component: () => import('@/views/ExportView.vue'),
+    },
+    {
       // 分享页：独立路由，走独立懒加载 chunk，不加载编辑器与对话面板。
       // 公开地址用表 id，便于被搜索引擎收录与人工识别。
       path: '/s/:id',

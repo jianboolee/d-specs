@@ -167,3 +167,28 @@ body {
 .ds-flash {
   animation: ds-flash 2s ease-out;
 }
+
+/* ==================== 打印 ==================== */
+
+/*
+ * 「导出 PDF」走浏览器打印（另存为 PDF）：分页、中文折行、字体都由浏览器负责，
+ * 服务端不必为此装中文字体。
+ *
+ * 打印发生在一个独立页面（/tables/:id/print，见 PrintView.vue），不在应用外壳里，
+ * 所以这里只需把「固定视口」的全局布局放开，让它能自然分页。
+ * 各页自己不需要打印的部分，用 .no-print / 页面内的 @media print 处理。
+ */
+@media print {
+  /* 应用是 height:100% + overflow:hidden 的固定视口布局，
+     打印时必须放开高度与滚动，否则只打得出第一屏。
+     #app 也要一起放开：它单独写了 height:100%，个别浏览器会解析成
+     「一页高」，把多页内容裁掉或挤出空白页。 */
+  html,
+  body,
+  #app {
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+}
+

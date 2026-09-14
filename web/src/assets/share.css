@@ -92,6 +92,32 @@
   color: var(--ds-border-strong);
 }
 
+/* 分享页的导出工具栏：拿到链接的人往往正要拿去报价/投标，给个直接导出的入口 */
+.share-page .share-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.share-page .toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 8px;
+  background: var(--ds-surface);
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-font-xs);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.share-page .toolbar-btn:hover {
+  border-color: var(--ds-primary);
+  color: var(--ds-text);
+}
+
 .share-page .group {
   margin-bottom: 26px;
 }
@@ -182,5 +208,140 @@
     font-size: var(--ds-font-sm);
     line-height: 1.6;
     overflow-wrap: anywhere;
+  }
+}
+
+/*
+ * 打印页的紧凑文档（.doc-compact）。
+ *
+ * 与公开分享页共用 .share-page 的文档样式，但打印件追求省纸：把留白与字号整体收紧
+ * 一档。只覆盖本页需要的几处，不动分享页的观感。
+ *
+ * 注意 .share-main 的留白只在屏幕下生效：打印时要用下面的 @media print 把
+ * padding/max-width 置零交给浏览器页边距，而 .doc-compact 多一个类、特异度更高，
+ * 不限定屏幕的话会把打印规则压住。
+ */
+@media screen {
+  .share-page.doc-compact .share-main {
+    max-width: 760px;
+    padding: 20px 18px 16px;
+  }
+}
+
+.share-page.doc-compact .spec-head {
+  margin-bottom: 16px;
+}
+
+.share-page.doc-compact .spec-head h1 {
+  margin-bottom: 4px;
+  font-size: 20px;
+}
+
+.share-page.doc-compact .spec-desc {
+  margin-bottom: 8px;
+  font-size: var(--ds-font-xs);
+  line-height: 1.6;
+}
+
+.share-page.doc-compact .group {
+  margin-bottom: 16px;
+}
+
+.share-page.doc-compact .group h2 {
+  margin-bottom: 6px;
+}
+
+.share-page.doc-compact .spec-row {
+  padding: 7px 12px;
+}
+
+.share-page.doc-compact .spec-row dt {
+  flex: 0 0 38%;
+  font-size: var(--ds-font-xs);
+}
+
+.share-page.doc-compact .spec-row dd {
+  font-size: var(--ds-font-sm);
+}
+
+/*
+ * 打印件统一黑色文字：屏幕上的灰阶层次在纸上要么发虚、要么浪费碳粉，
+ * 打印/导出 PDF 时全部压成黑，保证清晰。价格标签也去掉底色只留边框。
+ */
+.share-page.doc-compact,
+.share-page.doc-compact .spec-head h1,
+.share-page.doc-compact .spec-desc,
+.share-page.doc-compact .group h2,
+.share-page.doc-compact .spec-row dt,
+.share-page.doc-compact .spec-row dd,
+.share-page.doc-compact .spec-value,
+.share-page.doc-compact .spec-value.empty,
+.share-page.doc-compact .share-foot {
+  color: #000;
+}
+
+.share-page.doc-compact .spec-value.empty {
+  font-style: normal;
+}
+
+.share-page.doc-compact .tag {
+  border: 1px solid #000;
+  background: transparent;
+  color: #000;
+}
+
+.share-page.doc-compact .share-foot {
+  padding: 18px 0 0;
+}
+
+/*
+ * 两列并排（doc-cols-2）。
+ *
+ * 用 grid 而不是 CSS columns：grid 的每个分组是一个独立格子，不会被拆到
+ * 两栏里去；columns 会把一个表格劈开，读起来很难受。格子也对齐顶部，
+ * 高度不齐时不会互相拉扯。
+ */
+.share-page.doc-cols-2 .doc-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+  align-items: start;
+}
+
+/* 两列时列宽减半，参数名占比略放大以免换行 */
+.share-page.doc-cols-2 .spec-row dt {
+  flex: 0 0 46%;
+}
+
+/*
+ * 打印：分享页与打印文档共用这套样式，打印时都要去掉屏幕上的滚动容器与底色，
+ * 让内容自然分页；边框改成灰色以适应黑白打印。
+ *
+ * 刻意不加 break-inside: avoid：它会让不下的分组整块挪到下一页，留下一大片空白，
+ * 看起来就像被硬插了分页符。让内容自然连排更省纸。
+ */
+@media print {
+  .share-page {
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+
+  .share-page .share-main {
+    max-width: none;
+    padding: 0;
+  }
+
+  /* 打印时隐藏分享页的导出工具栏，纸上不需要 */
+  .share-page .share-toolbar {
+    display: none;
+  }
+
+  .share-page .spec-list {
+    border-color: #000;
+  }
+
+  .share-page .spec-row + .spec-row {
+    border-top-color: #000;
   }
 }

@@ -41,6 +41,18 @@ const updatedAt = computed(() => {
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
 })
 
+/**
+ * 导出 xlsx 的公开地址。
+ *
+ * 公开接口不需要 Authorization 头，所以直接用 <a download> 即可，
+ * 不必像应用内那样先 fetch 成 Blob。
+ */
+const exportUrl = computed(() => `/api/v1/public/specs/${tableId.value}/export`)
+
+function printPage() {
+  window.print()
+}
+
 onMounted(async () => {
   // 已有 SSR 数据就直接展示，不必再打一次接口；
   // 直接访问（无 SSR，例如前端 dev server）时才回退到接口拉取。
@@ -95,6 +107,18 @@ function readSeed(): PublicSpec | null {
               <span class="dot">·</span>
               <span>更新于 {{ updatedAt }}</span>
             </template>
+          </div>
+
+          <!-- 导出工具栏：公开接口与分享页同一访问边界，无需鉴权，直接下载 -->
+          <div class="share-toolbar">
+            <a class="toolbar-btn" :href="exportUrl" download>
+              <i class="ri-file-excel-2-line" />
+              Excel
+            </a>
+            <button type="button" class="toolbar-btn" @click="printPage">
+              <i class="ri-file-pdf-2-line" />
+              PDF
+            </button>
           </div>
         </div>
 

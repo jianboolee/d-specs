@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import DeleteTableDialog from './DeleteTableDialog.vue'
 import EditDescriptionDialog from './EditDescriptionDialog.vue'
+import ExportDialog from './ExportDialog.vue'
 import ShareDialog from './ShareDialog.vue'
 import TableNameDialog from './TableNameDialog.vue'
 
@@ -214,6 +215,10 @@ async function submitDescription(next: string) {
   }
 }
 
+// ---------- 导出 ----------
+
+const showExport = ref(false)
+
 function onShareChanged() {
   emit('share-changed')
 }
@@ -283,6 +288,11 @@ function describe(err: unknown, fallback: string) {
           复制链接
         </DropdownMenuItem>
 
+        <DropdownMenuItem @select="showExport = true">
+          <i class="ri-download-2-line" />
+          导出
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
 
         <DropdownMenuItem variant="destructive" @select="showDelete = true">
@@ -313,6 +323,8 @@ function describe(err: unknown, fallback: string) {
       :submitting="descriptionSubmitting"
       @submit="submitDescription"
     />
+
+    <ExportDialog v-model:open="showExport" :table-id="table.id" :table-title="table.title" />
 
     <ShareDialog
       v-model:show="showShare"
