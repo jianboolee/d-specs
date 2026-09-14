@@ -103,6 +103,21 @@ export const useSpecTableStore = defineStore('specTable', () => {
     return updated
   }
 
+  /**
+   * 通用元信息更新（标题/描述/行业）。
+   *
+   * 与 renameTable 一样：返回的详情合并进当前表，再刷新列表让卡片同步。
+   * 元信息更新不产生 revision，因此不进撤销栈。
+   */
+  async function updateMeta(id: string, patch: api.UpdateTableInput) {
+    const updated = await api.updateTable(id, patch)
+    if (table.value?.id === id) {
+      table.value = { ...table.value, ...updated }
+    }
+    await loadTables()
+    return updated
+  }
+
   // ---------- 当前表 ----------
 
   async function openTable(id: string) {
@@ -268,6 +283,7 @@ export const useSpecTableStore = defineStore('specTable', () => {
     duplicateTable,
     renameTable,
     setPinned,
+    updateMeta,
 
     // 当前表
     table,
