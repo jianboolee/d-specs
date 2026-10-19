@@ -5,18 +5,12 @@ export interface ApiResponse<T = unknown> {
   data?: T
 }
 
-/** 用户资料 */
+/** 用户资料（来自 d-auth 账户中心；name 即昵称，phone 已脱敏，不展示邮箱） */
 export interface UserProfile {
   id: string
-  email: string
   name: string
-}
-
-/** 登录 / 注册成功后的返回 */
-export interface AuthPayload {
-  token: string
-  expires_at: string
-  user: UserProfile
+  phone?: string
+  avatar_url?: string
 }
 
 // ==================== 参数表 ====================

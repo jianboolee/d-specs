@@ -20,7 +20,7 @@ const auth = useAuthStore()
 const spec = useSpecTableStore()
 const { open: openCreate } = useCreateTable()
 
-const displayName = computed(() => auth.user?.name || auth.user?.email || '')
+const displayName = computed(() => auth.user?.name || auth.user?.phone || '')
 
 const greeting = computed(() =>
   displayName.value ? `${displayName.value}，欢迎回来` : '欢迎回来',

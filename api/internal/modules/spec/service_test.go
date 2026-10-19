@@ -2,6 +2,7 @@ package spec
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"os"
 	"testing"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/jianboolee/d-specs/internal/ai/ops"
 	"github.com/jianboolee/d-specs/internal/infrastructure/database"
-	"github.com/jianboolee/d-specs/internal/infrastructure/idgen"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -40,24 +40,31 @@ func testDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// createTestUser 建一个测试用户，并在用例结束后清理其全部数据
+// fakeDAuthID 造一个形状合法的假 d-auth 用户 id（22 位小写字母数字）。
+// users 表已删除、user_id 无外键，测试不需要真的建用户，直接当不透明串用。
+func fakeDAuthID() string {
+	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, 22)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	for i := range b {
+		b[i] = letters[b[i]%byte(len(letters))]
+	}
+	return string(b)
+}
+
+// createTestUser 返回一个假 d-auth 用户 id，并在用例结束后清理其全部数据。
 func createTestUser(t *testing.T, db *gorm.DB, label string) string {
 	t.Helper()
 
-	id := idgen.New()
-	err := db.Exec(
-		`INSERT INTO users (id, email, name, password_hash) VALUES (?, ?, ?, ?)`,
-		id, id+"@test.local", label, "not-a-real-hash",
-	).Error
-	if err != nil {
-		t.Fatalf("创建测试用户失败: %v", err)
-	}
+	_ = label // 不再有本地用户行可写，保留参数兼容调用点
+	id := fakeDAuthID()
 
 	t.Cleanup(func() {
-		// spec_items / spec_revisions 都是 ON DELETE CASCADE，
-		// 先删表即可连带清干净
+		// spec_items / spec_revisions 是 ON DELETE CASCADE，先删表即可连带清干净
 		db.Exec(`DELETE FROM spec_tables WHERE user_id = ?`, id)
-		db.Exec(`DELETE FROM users WHERE id = ?`, id)
+		db.Exec(`DELETE FROM chat_sessions WHERE user_id = ?`, id)
 	})
 
 	return id

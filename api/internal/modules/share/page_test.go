@@ -126,7 +126,7 @@ func TestRenderAgainstRealBuild(t *testing.T) {
 		t.Skip("web/dist 不存在，跳过产物注入检查（先跑 npm run build）")
 	}
 
-	p := NewPageRenderer(dist, "参数配置表", "https://specs.21rv.com")
+	p := NewPageRenderer(dist, "参数配置表", "https://specs.x-rv.com")
 	out := string(p.Render(newTestContext(), "abc", sampleSpec()))
 
 	if strings.Contains(out, headMarker) || strings.Contains(out, bodyMarker) {
@@ -134,7 +134,7 @@ func TestRenderAgainstRealBuild(t *testing.T) {
 	}
 	for _, want := range []string{
 		`<title>手机参数表 - 参数配置表</title>`,
-		`rel="canonical" href="https://specs.21rv.com/s/abc"`,
+		`rel="canonical" href="https://specs.x-rv.com/s/abc"`,
 		`<h1>手机参数表</h1>`,
 		`5000mAh`,
 		// Vite 注入的模块脚本必须仍在，否则 Vue 无法接管页面
@@ -152,21 +152,21 @@ func TestAbsURLFallsBackToForwardedHeaders(t *testing.T) {
 
 	c := newTestContext()
 	c.Request.Header.Set("X-Forwarded-Proto", "https")
-	c.Request.Header.Set("X-Forwarded-Host", "specs.21rv.com")
+	c.Request.Header.Set("X-Forwarded-Host", "specs.x-rv.com")
 
-	if got := p.absURL(c, "/s/abc"); got != "https://specs.21rv.com/s/abc" {
+	if got := p.absURL(c, "/s/abc"); got != "https://specs.x-rv.com/s/abc" {
 		t.Fatalf("按转发头推导的地址不对：%s", got)
 	}
 }
 
 // 显式配置的 siteURL 优先，不依赖可被伪造的请求头。
 func TestAbsURLPrefersConfiguredSiteURL(t *testing.T) {
-	p := NewPageRenderer("/none", "参数配置表", "https://specs.21rv.com")
+	p := NewPageRenderer("/none", "参数配置表", "https://specs.x-rv.com")
 
 	c := newTestContext()
 	c.Request.Header.Set("X-Forwarded-Host", "evil.example.com")
 
-	if got := p.absURL(c, "/s/abc"); got != "https://specs.21rv.com/s/abc" {
+	if got := p.absURL(c, "/s/abc"); got != "https://specs.x-rv.com/s/abc" {
 		t.Fatalf("显式 siteURL 应优先：%s", got)
 	}
 }

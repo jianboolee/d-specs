@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { toast } from 'vue-sonner'
 
 import {
   DropdownMenu,
@@ -64,18 +63,30 @@ const activeId = computed(() => (route.name === 'workspace' ? String(route.param
 // 停在列表页时，「我的参数表」像被选中的列表条目一样高亮
 const isAllActive = computed(() => route.name === 'tables')
 
-const displayName = computed(() => auth.user?.name || auth.user?.email || '未登录')
+// 资料来自 d-auth 脱敏视图：phone 已是掩码形态，直接展示；不显示邮箱
+const displayName = computed(() => auth.user?.name || auth.user?.phone || '未登录')
+const displaySub = computed(() => auth.user?.phone ?? '')
 const avatarText = computed(() => displayName.value.slice(0, 1).toUpperCase())
+
+// 头像用 d-auth 下发的 avatar_url（绝对 CDN 地址）；加载失败或没设头像时
+// 回退到首字。切换账户后重置，让新头像有机会重试。
+const avatarOk = ref(true)
+watch(
+  () => auth.user?.id,
+  () => {
+    avatarOk.value = true
+  },
+)
 
 function onThemeSelect() {
   toggleTheme()
 }
 
+// 登出在 store 内完成：清本地态 + 直连 d-auth 清共享 cookie + 整页回 /login。
+// 这里只做本地收尾（重置列表态），不再自己跳转——整页刷新会归零全部内存状态。
 function onLogout() {
-  auth.logout()
   spec.reset()
-  toast.success('已退出登录')
-  void router.replace({ name: 'login' })
+  void auth.logout()
 }
 
 function openTable(id: string) {
@@ -226,10 +237,17 @@ onMounted(() => {
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <button class="user-btn" type="button" :title="isCollapsed ? displayName : undefined">
-            <span class="avatar">{{ avatarText }}</span>
+            <img
+              v-if="auth.user?.avatar_url && avatarOk"
+              class="avatar avatar-img"
+              :src="auth.user.avatar_url"
+              :alt="displayName"
+              @error="avatarOk = false"
+            />
+            <span v-else class="avatar">{{ avatarText }}</span>
             <span v-if="!isCollapsed" class="user-meta">
               <span class="ds-ellipsis user-name">{{ displayName }}</span>
-              <span class="ds-ellipsis user-sub">{{ auth.user?.email }}</span>
+              <span class="ds-ellipsis user-sub">{{ displaySub }}</span>
             </span>
             <i v-if="!isCollapsed" class="ri-more-2-fill" />
           </button>
@@ -489,6 +507,12 @@ onMounted(() => {
   color: var(--ds-text-secondary);
   font-size: var(--ds-font-xs);
   font-weight: 600;
+}
+
+/* 图片头像：裁成圆形填满，不显示首字方块的底色 */
+.avatar-img {
+  object-fit: cover;
+  background: var(--ds-surface-muted);
 }
 
 .user-meta {

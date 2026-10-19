@@ -14,7 +14,7 @@
 #      （或手动逐条填下面的变量）
 #   4. Deploy the stack
 #
-# 必填变量：DATABASE_URL、JWT_SECRET
+# 必填变量：DATABASE_URL、DAUTH_BASE_URL、DAUTH_CLIENT_KEY
 # 其余见 deploy/production.env 的注释。
 #
 # 数据库不在 Portainer 宿主机可达范围内时，需自行保证网络连通：
@@ -38,8 +38,17 @@ services:
       # 指向现有 PostgreSQL（完整连接串，由 Portainer 环境变量注入）
       DATABASE_URL: ${DATABASE_URL:?请设置 DATABASE_URL，例如 postgresql://user:pass@host:5432/dspecs?sslmode=disable}
 
-      JWT_SECRET: ${JWT_SECRET:?请设置 JWT_SECRET}
-      JWT_EXPIRE: ${JWT_EXPIRE:-720h}
+      # d-auth 账户中心（跨子域 SSO）：本地 users 表已移除，这是唯一的登录通道，
+      # 缺 DAUTH_BASE_URL / DAUTH_CLIENT_KEY 时应用拒绝启动。登录态由 d-auth 的
+      # 共享 cookie 承载并本地验签，不再自签 JWT（无需 JWT_SECRET）。
+      # API Key 只注入到后端，绝不下发前端。
+      DAUTH_BASE_URL: ${DAUTH_BASE_URL:?请设置 DAUTH_BASE_URL，例如 https://auth.x-rv.com}
+      DAUTH_CLIENT_KEY: ${DAUTH_CLIENT_KEY:?请设置 DAUTH_CLIENT_KEY，例如 web_specs}
+      DAUTH_COOKIE_NAME: ${DAUTH_COOKIE_NAME:-__Secure-dauth_access}
+      DAUTH_SSO_BASE_URL: ${DAUTH_SSO_BASE_URL:-}
+      DAUTH_JWT_ISSUER: ${DAUTH_JWT_ISSUER:-}
+      DAUTH_API_KEY: ${DAUTH_API_KEY:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
 
       # 留空则应用正常启动，仅 AI 对话不可用
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}

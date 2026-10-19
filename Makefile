@@ -1,6 +1,7 @@
 .PHONY: help api-dev api-run api-build migrate migrate-down ai-check api-test web-dev web-build web-install install \
-        docker-build docker-release docker-run nginx-push \
-        docker-dev docker-dev-down docker-dev-logs docker-dev-build
+        docker-build docker-release docker-run \
+        docker-dev docker-dev-down docker-dev-logs docker-dev-build \
+        image deploy deploy-only env-prod nginx
 
 ## 帮助
 
@@ -19,7 +20,13 @@ help:
 	@echo "  make docker-build   构建镜像（仅本机，不推送）"
 	@echo "  make docker-release 构建并推送 $(DOCKER_IMAGE):$(DOCKER_TAG)"
 	@echo "  make docker-run     用最新镜像本地起一个容器 :$(APP_PORT)"
-	@echo "  make nginx-push     推送 deploy/nginx/*.conf 到服务器并 reload nginx"
+	@echo ""
+	@echo "── 生产部署（入口机 nginx → 业务机容器，详见 deploy/）──"
+	@echo "  make image        交叉构建 linux/amd64 镜像并推 ACR（tag=$(IMG_TAG)）"
+	@echo "  make env-prod     铺 .env.prod 模板到业务机 /opt/d-specs/（不覆盖已填好的）"
+	@echo "  make deploy       构建推送 + 业务机拉镜像重启（需 .env.prod 已填）"
+	@echo "  make deploy-only  业务机 compose 拉取重启（缺省 latest；TAG=<日期tag> 可回滚）"
+	@echo "  make nginx        下发 specs.x-rv.com vhost 到入口机并 reload"
 	@echo ""
 
 # ---------- 端口约定 ----------
@@ -47,6 +54,17 @@ DOCKER_DEV_FILE ?= docker-compose.dev.yml
 # （含 APP_ENV=development、WEB_DIST_DIR=../web），这些在容器里会覆盖镜像的正确
 # 默认值，导致镜像跑成开发模式、且分享页 SSR 读不到入口 HTML。
 DOCKER_ENV_FILE ?= api/.env.docker
+
+# ---------- 生产部署（本机交叉构建 → ACR → 业务机拉镜像） ----------
+# 拓扑（与 d-note / d-auth / d-camp 一致）：
+#   入口机 39.107.77.69（172.17.255.63，外层 nginx，*.x-rv.com 通配证书）
+#   业务机 47.95.176.70（172.17.255.64，d-specs 容器 :8400）
+#   域名   https://specs.x-rv.com
+# 数据库复用入口机的 postgres18 容器（:5432）上的 dspecs 库。
+REGISTRY ?= registry.cn-beijing.aliyuncs.com/xrv/d-specs
+IMG_TAG  ?= $(shell date +%Y%m%d-%H%M)
+PROD_SSH ?= root@47.95.176.70
+EDGE_SSH ?= root@39.107.77.69
 
 ## 安装
 
@@ -110,7 +128,7 @@ docker-release:
 #
 # 环境变量有两个来源，按优先级：
 #   1) 存在 $(DOCKER_ENV_FILE) 时用它（推荐，见 api/.env.docker.example）
-#   2) 否则从当前 shell 透传 DATABASE_URL / JWT_SECRET / DEEPSEEK_API_KEY
+#   2) 否则从当前 shell 透传 DATABASE_URL / DAUTH_* / DEEPSEEK_API_KEY
 #
 # 注意 docker run 不会读 api/.env —— 那只有 docker compose 才会读。
 # 镜像已内置 APP_ENV=production / HTTP_PORT=8401 / WEB_DIST_DIR=/usr/share/nginx/html /
@@ -123,12 +141,17 @@ docker-run:
 			--env-file "$(DOCKER_ENV_FILE)" \
 			$(DOCKER_IMAGE):$(DOCKER_TAG); \
 	else \
-		echo "▶ 未找到 $(DOCKER_ENV_FILE)，改用当前 shell 的 DATABASE_URL / JWT_SECRET / DEEPSEEK_API_KEY"; \
+		echo "▶ 未找到 $(DOCKER_ENV_FILE)，改用当前 shell 的 DATABASE_URL / DAUTH_* / DEEPSEEK_API_KEY"; \
 		echo "  （可照 api/.env.docker.example 创建该文件，更省事）"; \
 		docker run --rm -p $(APP_PORT):80 \
 			-e DATABASE_URL \
-			-e JWT_SECRET \
 			-e DEEPSEEK_API_KEY \
+			-e DAUTH_BASE_URL \
+			-e DAUTH_CLIENT_KEY \
+			-e DAUTH_COOKIE_NAME \
+			-e DAUTH_SSO_BASE_URL \
+			-e DAUTH_JWT_ISSUER \
+			-e DAUTH_API_KEY \
 			$(DOCKER_IMAGE):$(DOCKER_TAG); \
 	fi
 
@@ -152,9 +175,34 @@ docker-dev-logs:
 docker-dev-build:
 	docker compose -f $(DOCKER_DEV_FILE) build --no-cache api
 
-## Nginx
+## 生产部署（本机交叉构建 → ACR → 业务机直接拉镜像）
+# 与 d-note / d-auth / d-camp 同形态：全栈单镜像（nginx 托管 SPA + /api 剥前缀转 Go），
+# 业务机只放应用容器，数据库用入口机的 postgres18。
 
-# 推送 deploy/nginx 下的站点配置到服务器，备份 -> 上传 -> nginx -t -> reload，失败自动回滚
-# 覆盖目标：make nginx-push NGINX_SERVER=root@1.2.3.4 NGINX_PORT=2222
-nginx-push:
-	@SERVER=$(NGINX_SERVER) PORT=$(NGINX_PORT) deploy/nginx/upload.sh
+# 交叉构建 linux/amd64 并推到 ACR（同时打日期 tag 和 latest）。
+# 注意：本机是 arm64，--platform linux/amd64；Dockerfile 的构建阶段钉在 BUILDPLATFORM，
+# 只有运行时阶段的 apk 那步走模拟。
+image:
+	docker buildx build --platform linux/amd64 \
+		-t $(REGISTRY):$(IMG_TAG) -t $(REGISTRY):latest --push .
+
+# 一键发布：构建推送 → 业务机 compose 拉镜像滚动更新（需 /opt/d-specs/.env.prod 已填好）。
+# 想只重新部署不重新构建：make deploy-only（缺省用 latest，可 TAG=<日期tag> 指定回滚）
+deploy: image deploy-only
+
+deploy-only:
+	scp -q deploy/docker-compose.prod.yml $(PROD_SSH):/opt/d-specs/docker-compose.yml
+	scp -q deploy/run-prod.sh $(PROD_SSH):/opt/d-specs/run-prod.sh
+	ssh $(PROD_SSH) 'TAG=$(if $(TAG),$(TAG),latest) bash /opt/d-specs/run-prod.sh'
+
+# 把 env 模板铺到业务机（不覆盖已有 .env.prod；填好后 make deploy-only）
+env-prod:
+	ssh $(PROD_SSH) 'mkdir -p /opt/d-specs'
+	scp -q deploy/env.prod.example $(PROD_SSH):/opt/d-specs/env.prod.example
+	ssh $(PROD_SSH) 'test -f /opt/d-specs/.env.prod || { cp /opt/d-specs/env.prod.example /opt/d-specs/.env.prod && chmod 600 /opt/d-specs/.env.prod && echo "✔ 已生成 /opt/d-specs/.env.prod（待填写 DATABASE_URL / DAUTH_CLIENT_KEY / DAUTH_API_KEY）"; } || echo "· /opt/d-specs/.env.prod 已存在，未覆盖"'
+
+# 下发入口机 vhost（改动前先备份远端旧版；nginx -t 不过就不 reload）
+nginx:
+	@ssh $(EDGE_SSH) 'test -f /etc/nginx/conf.d/specs.x-rv.com.conf && cp /etc/nginx/conf.d/specs.x-rv.com.conf /etc/nginx/conf.d/backups/specs.x-rv.com_backup_$$(date +%Y%m%d_%H%M%S).conf || true'
+	scp -q deploy/nginx/specs.x-rv.com.conf $(EDGE_SSH):/etc/nginx/conf.d/specs.x-rv.com.conf
+	ssh $(EDGE_SSH) 'nginx -t && systemctl reload nginx && echo "✔ specs.x-rv.com vhost 已生效"'

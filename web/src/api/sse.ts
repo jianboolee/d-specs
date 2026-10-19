@@ -1,4 +1,4 @@
-import { ApiError, getToken } from './http'
+import { ApiError } from './http'
 
 export interface SSEEvent {
   event: string
@@ -13,20 +13,19 @@ export interface SSEOptions {
 /**
  * 用 POST + fetch 读 SSE 流。
  *
- * 不用原生 EventSource：它只能发 GET，也没法带 Authorization 头，
- * 而我们的对话接口是 POST + Bearer Token。
+ * 不用原生 EventSource：它只能发 GET，也没法带自定义头；而我们的对话接口
+ * 是 POST，鉴权走 d-auth 的共享 cookie（`credentials: 'include'`）。
  * 这里只实现用得到的部分：按空行切事件块，取 event / data 两类字段。
  */
 export async function postSSE(url: string, body: unknown, options: SSEOptions): Promise<void> {
   const headers = new Headers({ 'Content-Type': 'application/json' })
-  const token = getToken()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
 
   let response: Response
   try {
     response = await fetch(url, {
       method: 'POST',
       headers,
+      credentials: 'include',
       body: JSON.stringify(body),
       signal: options.signal,
     })

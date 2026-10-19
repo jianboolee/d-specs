@@ -24,7 +24,7 @@ func Register(engine *gin.Engine, rg *gin.RouterGroup, d *deps.Deps, specSvc *sp
 	h := NewHandler(svc, page)
 
 	authed := rg.Group("")
-	authed.Use(middleware.AuthRequired(d.JWT))
+	authed.Use(middleware.AuthRequired(d.Verifier, d.Config.DAuth.CookieName))
 
 	authed.GET("/tables/:id/share", h.Status)
 	authed.POST("/tables/:id/share", h.Enable)

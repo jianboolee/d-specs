@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,8 +14,8 @@ import (
 	"github.com/jianboolee/d-specs/internal/ai/provider"
 	"github.com/jianboolee/d-specs/internal/config"
 	"github.com/jianboolee/d-specs/internal/deps"
-	infraauth "github.com/jianboolee/d-specs/internal/infrastructure/auth"
 	"github.com/jianboolee/d-specs/internal/infrastructure/database"
+	"github.com/jianboolee/d-specs/internal/infrastructure/dauthclient"
 	"github.com/jianboolee/d-specs/internal/infrastructure/logger"
 	"github.com/jianboolee/d-specs/internal/middleware"
 	"github.com/jianboolee/d-specs/internal/router"
@@ -52,20 +53,28 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, llmErr
 	}
 
+	// d-auth 是唯一的登录通道：生产缺配置 fail-fast，开发缺配置降级启动
+	dauth, dauthErr := connectDAuth(log, cfg, cfg.IsDevelopment())
+	if dauthErr != nil {
+		closeDB(db)
+		return nil, dauthErr
+	}
+
 	logDependencyStatus(log, db != nil, llm != nil, cfg.IsDevelopment())
 
 	engine := gin.New()
 	engine.Use(gin.Logger())
 	engine.Use(middleware.RequestID())
-	engine.Use(middleware.CORS())
+	engine.Use(middleware.CORS(cfg))
 	engine.Use(middleware.Recover(log))
 
 	d := &deps.Deps{
-		Config: cfg,
-		DB:     db,
-		JWT:    infraauth.NewJWTManager(cfg.JWTSecret, cfg.JWTExpire),
-		LLM:    llm,
-		Logger: log,
+		Config:   cfg,
+		DB:       db,
+		LLM:      llm,
+		Logger:   log,
+		Verifier: dauth.Verifier,
+		Profiles: dauth.Profiles,
 	}
 	router.Setup(engine, d)
 
@@ -160,6 +169,55 @@ func connectDeepSeek(log *slog.Logger, cfg *config.Config) (provider.Provider, e
 
 	log.Info("DeepSeek 已就绪", "model", p.Model(), "base_url", cfg.AI.DeepSeek.BaseURL)
 	return p, nil
+}
+
+// dauthBundle 是 d-auth 接入所需的两件套：
+//   - Verifier 本地验签 access token（登录态判定，必须有）；
+//   - Profiles 按用户 ID 取脱敏展示资料（缺失时展示降级为空）。
+type dauthBundle struct {
+	Verifier dauthclient.TokenVerifier
+	Profiles dauthclient.ProfileFetcher
+}
+
+// connectDAuth 构造 d-auth 接入组件。
+//
+// 登录态由 d-auth 下发的共享 cookie 承载，本后端本地验签即认人，因此
+// 必须的配置是 DAUTH_BASE_URL（拉 JWKS 公钥的 origin）与 DAUTH_CLIENT_KEY
+// （前端拼登录跳转用）：
+//   - 非生产环境缺配置：返回一个占位 bundle，服务照常启动，
+//     登录接口不可用（本地验签会失败），方便离线开发；
+//   - 生产环境缺配置直接报错拒绝启动（fail-fast）——带着空配置上线
+//     等于全站无法登录，静默半坏比启动失败危险得多。
+//
+// API Key 只注入后端，绝不下发前端；缺失时展示降级（昵称/头像为空），
+// 不影响登录判定与授权。
+func connectDAuth(log *slog.Logger, cfg *config.Config, isDev bool) (dauthBundle, error) {
+	if cfg.DAuth.BaseURL == "" || cfg.DAuth.ClientKey == "" {
+		if isDev {
+			log.Warn("d-auth 未配置（DAUTH_BASE_URL / DAUTH_CLIENT_KEY 缺失）：登录不可用",
+				"hint", "本地开发请配置账户中心，或仅使用不需要登录的公开页",
+			)
+			return dauthBundle{Verifier: dauthclient.NewTokenVerifier("", "")}, nil
+		}
+		return dauthBundle{}, errors.New(
+			"d-auth 未配置：DAUTH_BASE_URL 与 DAUTH_CLIENT_KEY 均为必填（用户身份唯一来源，缺失则无法登录）。" +
+				"向 d-auth 管理员索取配置后重试",
+		)
+	}
+
+	verifier := dauthclient.NewTokenVerifier(cfg.DAuth.BaseURL, cfg.DAuth.JWTIssuer)
+	profiles := dauthclient.NewProfileClient(cfg.DAuth.BaseURL, cfg.DAuth.APIKey)
+	if cfg.DAuth.APIKey == "" {
+		log.Warn("DAUTH_API_KEY 未配置：昵称/头像将无法展示（登录不受影响）")
+	}
+
+	log.Info("d-auth 已启用",
+		"base_url", cfg.DAuth.BaseURL,
+		"sso_base_url", cfg.DAuth.SSOBaseURL,
+		"client_key", cfg.DAuth.ClientKey,
+		"cookie_name", cfg.DAuth.CookieName,
+	)
+	return dauthBundle{Verifier: verifier, Profiles: profiles}, nil
 }
 
 func logDependencyStatus(log *slog.Logger, dbOK, llmOK, isDev bool) {

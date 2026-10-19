@@ -21,10 +21,11 @@ const router = createRouter({
       component: () => import('@/views/DashboardView.vue'),
     },
     {
+      // 本地登录页：不自动跳 SSO，用户点「登录」才整页跳转到 d-auth。
       path: '/login',
       name: 'login',
       component: () => import('@/views/LoginView.vue'),
-      meta: { public: true },
+      meta: { public: true, guestOnly: true },
     },
     {
       path: '/tables',
@@ -72,14 +73,25 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore(pinia)
 
-  if (!auth.ready) {
-    await auth.restore()
+  // 分享页（standalone）是给外部访客与爬虫看的，不做登录探测，避免拖慢首屏
+  const skipProbe = to.meta.layout === 'standalone'
+
+  if (!skipProbe && auth.loading) {
+    await auth.probe()
   }
 
+  // 已登录访问登录页 → 回工作台
+  if (to.meta.guestOnly && auth.isLoggedIn) {
+    return { name: 'dashboard' }
+  }
+
+  // 公开页放行（介绍页/发现页会据此显示「进入工作台」，故仍需上面的探测）
   if (to.meta.public) {
     return true
   }
 
+  // 未登录访问需登录的页面 → 停在本地登录页（不自动跳 SSO，由用户点「登录」触发）。
+  // 带上 redirect 记住原本想去的路径，登录回跳后直达。
   if (!auth.isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }

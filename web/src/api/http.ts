@@ -1,24 +1,10 @@
 import type { ApiResponse } from '@/types/api'
 
-const TOKEN_KEY = 'dspecs.token'
-
 let onUnauthorized: (() => void) | null = null
 
-/** 注册 401 回调，由 auth store 在初始化时注入，避免 http 层依赖路由 */
+/** 注册 401 回调，由入口在初始化时注入，避免 http 层依赖路由 */
 export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler
-}
-
-export function getToken(): string {
-  return localStorage.getItem(TOKEN_KEY) ?? ''
-}
-
-export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token)
-}
-
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY)
 }
 
 /** 业务错误：携带后端返回的 code，message 可直接展示给用户 */
@@ -43,6 +29,9 @@ interface RequestOptions {
 /**
  * 统一请求封装。
  *
+ * 登录态由 d-auth 下发的 `.x-rv.com` 共享 cookie 承载（HttpOnly，JS 读不到），
+ * 所以固定带 `credentials: 'include'`，不再有 Authorization 头与本地 token。
+ *
  * 后端约定：HTTP 状态码表达传输层结果，body.code 表达业务结果。
  * 这里把非 0 的 code 统一转成 ApiError，让调用方只处理异常分支。
  */
@@ -60,8 +49,6 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   const headers = new Headers()
-  const token = getToken()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
   if (body !== undefined) headers.set('Content-Type', 'application/json')
 
   let response: Response
@@ -69,6 +56,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     response = await fetch(url, {
       method,
       headers,
+      credentials: 'include',
       body: body === undefined ? undefined : JSON.stringify(body),
     })
   } catch {
@@ -76,7 +64,6 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (response.status === 401) {
-    clearToken()
     onUnauthorized?.()
     throw new ApiError('登录已过期，请重新登录', 401, 401)
   }
@@ -105,23 +92,18 @@ export interface DownloadResult {
  * 下载文件（如导出的 xlsx）。
  *
  * 不能复用 request()：它恒按 JSON 信封解析，遇到二进制会抛错。
- * 也不能用 <a href> 直接指到接口：鉴权走 Authorization 头，
- * 而浏览器发起链接跳转时带不上这个头，所以必须 fetch + Blob。
+ * 鉴权走共享 cookie，所以带 credentials: 'include'（不能像普通链接那样
+ * 依赖浏览器自动携带——导出接口可能跨源，且需要统一处理 401）。
  */
 export async function download(path: string): Promise<DownloadResult> {
-  const headers = new Headers()
-  const token = getToken()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
-
   let response: Response
   try {
-    response = await fetch(`/api/v1${path}`, { headers })
+    response = await fetch(`/api/v1${path}`, { credentials: 'include' })
   } catch {
     throw new ApiError('网络异常，请检查后端服务是否已启动', -1, 0)
   }
 
   if (response.status === 401) {
-    clearToken()
     onUnauthorized?.()
     throw new ApiError('登录已过期，请重新登录', 401, 401)
   }

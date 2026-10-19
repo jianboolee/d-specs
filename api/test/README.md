@@ -8,7 +8,7 @@
 # 终端 1：先启动 API
 make dev
 
-# 终端 2：创建测试账号并把 token 写入 http-client.private.env.json
+# 终端 2：登录测试账号并把 token 写入 http-client.private.env.json
 make http-sync
 
 # CLI 跑接口
@@ -37,7 +37,7 @@ http-client.private.env.json   token 等（已 gitignore）
 | 文件 | 模块 |
 |------|------|
 | `00-health.http` | 健康检查与依赖就绪（PostgreSQL / LLM） |
-| `10-auth.http` | 注册 / 登录 / 当前用户，含越权与校验失败的反例 |
+| `10-auth.http` | SSO 配置 / 登录态探针 / 当前用户，含未登录与无效凭证的反例 |
 | `20-tables.http` | 参数表 CRUD、变更、乐观锁、版本恢复、复制 |
 | `30-share.http` | 分享开启/关闭、公开读取、token 复用与失效 |
 | `40-chat.http` | AI 对话（SSE），含改动落库与会话多轮续接 |
@@ -46,15 +46,23 @@ http-client.private.env.json   token 等（已 gitignore）
 
 | 变量 | 说明 |
 |------|------|
-| `baseUrl` | 默认 `http://localhost:8401` |
-| `email` | 测试账号邮箱，默认 `demo@dspecs.dev` |
-| `token` | `make http-sync` 自动填充 |
-| `userId` | `make http-sync` 自动填充 |
+| `baseUrl` | 本后端，默认 `http://localhost:8401` |
+| `dauthBaseUrl` | d-auth origin（不带 `/v1`），默认 `http://localhost:8681` |
+| `token` | d-auth 的 access token，`make http-sync` 自动填充 |
+| `userId` | `make http-sync` 自动填充（d-auth 用户 id） |
+| `identifier` / `password` | 测试账号，`make http-sync` 写入 private env |
 
-`sync-env.sh` 支持用环境变量覆盖：
+登录在 d-auth 完成、本后端不再代理；后端仍接受 `Authorization: Bearer <access token>`
+（本地 JWKS 验签），所以 `sync-env.sh` 直接打 d-auth 的密码登录接口拿 token。
+需要一个**已在 d-auth 存在**的账号（管理员建号，或人工完成一次短信验证码登录）：
 
 ```bash
-DS_BASE_URL=http://localhost:8401 DS_TEST_EMAIL=me@example.com make http-sync
+# 邮箱账号（需管理员在 d-auth 开通）
+DS_TEST_IDENTIFIER=me@example.com DS_TEST_PASSWORD=xxx make http-sync
+# 指向生产账户中心
+DAUTH_BASE_URL=https://auth.x-rv.com DS_TEST_IDENTIFIER=... DS_TEST_PASSWORD=... make http-sync
+# 或用现成 token 直接注入（比如短信登录拿到的会话）
+DS_TOKEN=... make http-sync
 ```
 
 ## 新增接口

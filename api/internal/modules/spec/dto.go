@@ -47,15 +47,15 @@ type RestoreRequest struct {
 
 // TableSummary 列表项，带参数项数量与公开访问次数
 type TableSummary struct {
-	ID              string    `gorm:"column:id" json:"id"`
-	Title           string    `gorm:"column:title" json:"title"`
-	Description     string    `gorm:"column:description" json:"description"`
-	Industry        string    `gorm:"column:industry" json:"industry"`
-	Tags            []string  `gorm:"column:tags;serializer:json" json:"tags"`
-	Visibility      string    `gorm:"column:visibility" json:"visibility"`
-	Pinned          bool      `gorm:"column:pinned" json:"pinned"`
-	CurrentRevision int       `gorm:"column:current_revision" json:"current_revision"`
-	ItemCount       int       `gorm:"column:item_count" json:"item_count"`
+	ID              string   `gorm:"column:id" json:"id"`
+	Title           string   `gorm:"column:title" json:"title"`
+	Description     string   `gorm:"column:description" json:"description"`
+	Industry        string   `gorm:"column:industry" json:"industry"`
+	Tags            []string `gorm:"column:tags;serializer:json" json:"tags"`
+	Visibility      string   `gorm:"column:visibility" json:"visibility"`
+	Pinned          bool     `gorm:"column:pinned" json:"pinned"`
+	CurrentRevision int      `gorm:"column:current_revision" json:"current_revision"`
+	ItemCount       int      `gorm:"column:item_count" json:"item_count"`
 	// ViewCount 公开分享页的累计访问次数。未开启过分享时为 0。
 	ViewCount int64     `gorm:"column:view_count" json:"view_count"`
 	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`

@@ -57,12 +57,12 @@ func TestRegisterRoutesDoNotPanic(t *testing.T) {
 func TestRobotsHandler(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	h := NewHandler(nil, NewPageRenderer("/none", "参数配置表", "https://specs.21rv.com"))
+	h := NewHandler(nil, NewPageRenderer("/none", "参数配置表", "https://specs.x-rv.com"))
 	engine.GET("/robots.txt", h.Robots)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/robots.txt", nil)
-	req.Host = "specs.21rv.com"
+	req.Host = "specs.x-rv.com"
 	engine.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
@@ -72,7 +72,7 @@ func TestRobotsHandler(t *testing.T) {
 	if !strings.Contains(body, "Allow: /s/") {
 		t.Fatalf("robots 应放行分享页：%s", body)
 	}
-	if !strings.Contains(body, "Sitemap: https://specs.21rv.com/sitemap.xml") {
+	if !strings.Contains(body, "Sitemap: https://specs.x-rv.com/sitemap.xml") {
 		t.Fatalf("robots 应指向 sitemap：%s", body)
 	}
 	if !strings.Contains(body, "Disallow: /api/") {

@@ -40,7 +40,7 @@ internal/
   deps/       共享依赖容器
   contextx/   context 透传（当前登录用户等）
   infrastructure/
-    auth/     JWT 签发与校验
+    dauthclient/ d-auth 接入：JWKS 本地验签 + API Key 取展示资料
     database/ GORM + PostgreSQL
     idgen/    实体 ID（UUID v7）与分享 token 生成
     logger/   slog
@@ -48,7 +48,7 @@ internal/
   response/   统一响应体与中文校验错误
   router/     路由总装
   modules/
-    auth/     注册 / 登录 / JWT
+    auth/     登录态探针 / 当前用户（登录由 d-auth SSO 承担）
     spec/     参数表 CRUD、变更执行器、版本与撤销
     chat/     AI 对话编排、SSE、会话与审计落库
     share/    只读分享链接
@@ -97,6 +97,10 @@ system prompt 只包含参数名与分组，不含参数值；需要值时模型
 
 | 变量 | 说明 |
 |------|------|
+| `DAUTH_BASE_URL` | d-auth origin（不带 `/v1`），拉 JWKS 公钥与取展示资料；生产必填 |
+| `DAUTH_CLIENT_KEY` | 子系统应用标识，拼进 SSO 登录跳转；生产必填 |
+| `DAUTH_COOKIE_NAME` | 承载 access JWT 的 cookie 名，须与 d-auth 一致 |
+| `DAUTH_API_KEY` | `users:read` 密钥，仅取昵称/头像；留空则展示降级 |
 | `DEEPSEEK_MODEL` | 模型 id，以 `GET /models` 返回为准，用 `make ai-check` 验证 |
 | `AI_MAX_TOOL_ROUNDS` | agent loop 轮数上限，同时是校验失败重试次数上限 |
 | `AI_AUTO_APPLY_MAX_OPS` | 安全阀：单次 ops 超过该条数转为待用户确认；设 0 关闭 |
@@ -134,11 +138,12 @@ provider 已单独保留该字段（不展示、不回传），agent 在正文�
 GET  /health                            健康检查
 GET  /health/ready                      依赖就绪检查（含 LLM）
 
-POST /api/v1/auth/register              注册
-POST /api/v1/auth/login                 登录
-GET  /api/v1/me                         当前用户
+# 认证（d-auth 跨子域 SSO：登录在 d-auth 中央登录页完成，本服务不代理登录）
+GET  /api/v1/auth/config                SSO 配置：d-auth origin 与 client_key（公开）
+GET  /api/v1/auth/session               登录态探针：未登录 {user:null}，不报错（公开）
+GET  /api/v1/me                         当前用户（d-auth 脱敏资料，无 email；需登录）
 
-# 参数表（均需 Bearer Token）
+# 参数表（均需登录：d-auth 共享 cookie 或 Bearer access JWT）
 GET    /api/v1/tables                   列表（keyword / page / size）
 POST   /api/v1/tables                   建表
 GET    /api/v1/tables/:id               详情（表 + 全部参数项 + 分组）

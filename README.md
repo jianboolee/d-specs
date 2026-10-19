@@ -49,7 +49,7 @@ docker exec -e PGPASSWORD=postgres postgres18 \
 ```bash
 # 后端
 cd api
-cp .env.example .env        # 填入 DEEPSEEK_API_KEY
+cp .env.example .env        # 填入 DEEPSEEK_API_KEY、DAUTH_* （见 api/.env.example）
 make migrate                # 建表
 make dev                    # :8401
 
@@ -59,7 +59,10 @@ npm install --cache ./.npm-cache
 npm run dev                 # :8402，已配置 /api、/s/ 代理到 8401
 ```
 
-访问 http://localhost:8402 ，用演示账号 `demo@dspecs.dev` / `demo12345` 登录。
+访问 http://localhost:8402 。**登录由 d-auth 统一账户中心承担**（跨子域 SSO）：
+点「登录」会整页跳转到 `auth.x-rv.com`，登录成功后回跳本站。本地纯 `localhost`
+无法复现跨子域 cookie（需用 `specs.local.test` 之类的本地子域），详见
+[docs/dauth-integration.md](docs/dauth-integration.md) §7。
 
 > 不想在本机装 Go / Node、或想要容器化的热重载环境，见
 > [本地开发：容器化热重载](#本地开发容器化热重载make-docker-dev)。
@@ -72,7 +75,7 @@ npm run dev                 # :8402，已配置 /api、/s/ 代理到 8401
 
 ## 分享页与 SEO
 
-开启分享后，公开地址是 `/s/<表id>`（例如 `https://specs.21rv.com/s/01a094a2-...`）。
+开启分享后，公开地址是 `/s/<表id>`（例如 `https://specs.x-rv.com/s/01a094a2-...`）。
 这些页面**是公开可收录的**：任何拿到链接的人都能访问，搜索引擎也可以抓取和检索。
 
 为了让不执行 JS 的爬虫（百度、微信/飞书的链接预览）也能读到内容，分享页由
@@ -118,29 +121,34 @@ cd api && make ai-check
 
 ## 构建与发布镜像
 
-发布镜像 `jianboo/d-specs` 是**全栈单镜像**：nginx 托管前端产物，并把
-`/api` 与 `/health` 反代到同容器内的 Go 服务，监听 80 端口。
+发布镜像是**全栈单镜像**：nginx 托管前端产物，并把 `/api`、`/health`、`/s/`（分享页
+SSR）反代到同容器内的 Go 服务，监听 80 端口。
+
+**生产发布**（与 d-note / d-auth / d-camp 同一套拓扑）：
+
+```bash
+make image        # 交叉构建 linux/amd64 并推 ACR（registry.cn-beijing.aliyuncs.com/xrv/d-specs）
+make env-prod     # 首次：把 env.prod.example 铺到业务机 /opt/d-specs/.env.prod
+make deploy       # = image + deploy-only（业务机拉镜像重启）
+make deploy-only  # 只重新部署，不重新构建（TAG=<日期tag> 可回滚）
+make nginx        # 下发入口机 vhost 并 reload
+```
+
+拓扑：入口机 39.107.77.69 外层 nginx（`*.x-rv.com` 通配证书）→ 业务机 47.95.176.70
+的 `d-specs` 容器 `:8400`；数据库复用入口机 `postgres18:5432` 的 `dspecs` 库。
+细节与 d-auth 待办见 [docs/dauth-integration.md](docs/dauth-integration.md)。
+
+**本地/单机镜像**（Docker Hub，不经 ACR）：
 
 ```bash
 make docker-build     # 只在本机构建，不推送
-make docker-release   # 构建并推送到 Docker Hub
+make docker-release   # 构建并推送到 Docker Hub（默认 latest）
+make docker-run       # 本地起一个容器试跑（:8400）
 ```
 
-`make docker-release` 默认发布 **latest**。需要同时保留一个版本号时显式指定：
-
-```bash
-make docker-release DOCKER_TAG=v1.0.0
-```
-
-推送前先登录（凭据不要写进仓库）：
-
-```bash
-docker login
-```
-
-默认按 `linux/amd64` 构建（常见云服务器架构）。本机是 Apple Silicon 想本地试跑，
-用 `DOCKER_PLATFORMS=linux/arm64` 覆盖；需要同时发布两种架构时传
-`DOCKER_PLATFORMS=linux/amd64,linux/arm64`（多平台需要 buildx）。
+`make docker-release` 需要版本号时显式指定：`make docker-release DOCKER_TAG=v1.0.0`。
+推送前先 `docker login`（凭据不要写进仓库）。默认按 `linux/amd64` 构建；Apple Silicon
+本地试跑用 `DOCKER_PLATFORMS=linux/arm64` 覆盖。
 
 ### 运行
 
@@ -150,7 +158,9 @@ PostgreSQL 是**外部依赖**，通过环境变量注入（变量清单见 `api
 ```bash
 docker run -d -p 8400:80 --name dspecs \
   -e DATABASE_URL="postgresql://user:pass@host:5432/dspecs?sslmode=disable" \
-  -e JWT_SECRET="<openssl rand -base64 48 | tr -d '/+='>" \
+  -e DAUTH_BASE_URL="https://auth.x-rv.com" \
+  -e DAUTH_CLIENT_KEY="web_specs" \
+  -e DAUTH_API_KEY="<sk-...>" \
   -e DEEPSEEK_API_KEY="<key>" \
   -e PUBLIC_URL_BASE="" \
   jianboo/d-specs:v1.0.0
@@ -168,7 +178,7 @@ docker run --rm -e DATABASE_URL="..." jianboo/d-specs:v1.0.0 migrate up
 它的环境变量有两个来源，**优先级从高到低**：
 
 1. `api/.env.docker`（存在时自动使用，推荐）。照 `api/.env.docker.example` 复制一份即可。
-2. 当前 shell 里 `export` 过的 `DATABASE_URL` / `JWT_SECRET` / `DEEPSEEK_API_KEY`。
+2. 当前 shell 里 `export` 过的 `DATABASE_URL` / `DAUTH_*` / `DEEPSEEK_API_KEY`。
 
 > ⚠️ **不要用 `--env-file api/.env`（或把 `api/.env` 复制成 `.env.docker`）**。
 > `api/.env` 是「后端直接跑在宿主机」的配置，其中 `APP_ENV=development` 和
@@ -224,35 +234,30 @@ make docker-dev-down   # 停
 
 ## 用 docker compose 部署（自建服务器）
 
-`deploy/` 下提供三套编排方案，按「数据库由谁托管」选择：
+`deploy/` 下的编排文件：
 
 | 文件 | 数据库 | 适用场景 |
 |------|--------|----------|
-| `deploy/docker-compose.yml` | 本栈托管 PostgreSQL 18 | 全新服务器，从零起 | 
-| `deploy/portainer-stack.yml` | 本栈托管 PostgreSQL 18 | 同上，走 Portainer |
-| `deploy/portainer-stack-external-db.yml` | **使用现有数据库** | 服务器已有 PG，只想跑应用 |
+| `deploy/docker-compose.prod.yml` | 使用外部实例 | **生产**：业务机 /opt/d-specs/（配合 `make deploy`，见上文） |
+| `deploy/docker-compose.yml` | 使用外部实例 | 单机/Portainer：只跑应用容器，连现有 PG |
 
-### 方案一：连同数据库一起起（自建服务器）
+### 生产（官方拓扑）
+
+见上文「构建与发布镜像」：`make image` → `make env-prod`（填 `.env.prod`）→ `make deploy`
+→ `make nginx`。编排文件是 `deploy/docker-compose.prod.yml`，部署在业务机 `/opt/d-specs/`。
+
+### 单机 / Portainer（现有数据库）
+
+适合已有共享 PostgreSQL、只想跑一个应用容器的场景：
 
 ```bash
 cd deploy
-cp .env.example .env     # 至少填 POSTGRES_PASSWORD 与 JWT_SECRET
-docker compose up -d
+cp .env.example .env     # 至少填 DATABASE_URL 与 DAUTH_BASE_URL / DAUTH_CLIENT_KEY
+docker compose -f docker-compose.yml up -d
 ```
 
 默认访问 `http://<服务器>:8400`。`deploy/.env` 已在 `.gitignore` 中，不会被提交。
-
-### 方案二：只用应用 + 现有数据库（Portainer 推荐）
-
-适合团队已有共享 PostgreSQL 的情况，只部署一个应用容器：
-
-1. Portainer → Stacks → Add stack，粘贴 `deploy/portainer-stack-external-db.yml`
-2. 点 **Load variables from .env file**，导入 `deploy/production.env`
-3. 确认 `DATABASE_URL` 指向正确的库（库不存在时见下方说明）
-4. Deploy
-
-`deploy/production.env` 含真实密钥，同样已在 `.gitignore` 中。它只负责把一个
-应用容器接上现有库，**不做数据库备份/持久化**——那是数据库实例自己的事。
+`deploy/.env.prod`、`deploy/production.env` 同理（含真实密钥，不提交）。
 
 ### 首次部署：库还不存在怎么办
 
@@ -296,8 +301,8 @@ docker exec -e PGPASSWORD=<密码> postgres18 \
 - **Postgres 18 数据卷挂 `/var/lib/postgresql`**：18 起数据目录改为
   `/var/lib/postgresql/18/docker`，挂成旧路径 `.../data` 会让数据落在容器层、
   重启即丢；
-- **必填变量缺省即报错**：未设置数据库密码 / `JWT_SECRET` 时 compose 直接失败，
-  避免用弱默认密钥把服务跑起来；
+- **必填变量缺省即报错**：未设置 `DATABASE_URL` / `DAUTH_BASE_URL` / `DAUTH_CLIENT_KEY`
+  时 compose 直接失败，避免带着空配置上线（全站无法登录）；
 - **未配 `DEEPSEEK_API_KEY` 仍可启动**：应用正常服务，仅 AI 对话不可用
   （`/health` 会返回 `llm: false`）；
 - **外部库方案配了 `extra_hosts`**：让 `host.docker.internal` 在 Linux 上也能解析，
@@ -312,10 +317,11 @@ docker exec -e PGPASSWORD=<密码> postgres18 \
 
 | 阶段 | 状态 |
 |------|------|
-| Phase 0 骨架 | ✅ 后端骨架、迁移、认证、AI 层、前端脚手架 |
+| Phase 0 骨架 | ✅ 后端骨架、迁移、认证（d-auth SSO）、AI 层、前端脚手架 |
 | Phase 1 参数表 CRUD | ✅ 手工编辑、版本快照、撤销重做、复制表、跨用户隔离 |
 | Phase 2 AI 对话 + 分享 | ✅ SSE 对话、改动联动、会话审计、只读分享链接 |
 
-现在可以真实使用：注册登录 → 建表 → 手工编辑或直接让 AI 改 → 随时撤销 → 分享出去。
+现在可以真实使用：登录（d-auth 账户中心）→ 建表 → 手工编辑或直接让 AI 改 →
+随时撤销 → 分享出去。
 
 后续方向见 [docs/PLAN.md](docs/PLAN.md) 第 9 节。

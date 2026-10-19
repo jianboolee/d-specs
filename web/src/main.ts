@@ -3,6 +3,8 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import { pinia } from './stores'
+import { setUnauthorizedHandler } from './api/http'
+import { useAuthStore } from './stores/auth'
 
 import '@/assets/main.css'
 import '@/assets/tailwind.css'
@@ -15,5 +17,16 @@ const app = createApp(App)
 
 app.use(pinia)
 app.use(router)
+
+// 后端 401 = 会话失效（d-auth 登出/吊销/过期）：清空登录态并回到本地登录页。
+// 路由守卫只在导航时兜底；这里处理「已停在页面上、后台请求突然 401」的情况。
+setUnauthorizedHandler(() => {
+  const auth = useAuthStore(pinia)
+  auth.user = null
+  const current = router.currentRoute.value
+  if (current.name !== 'login' && !current.meta.public) {
+    void router.replace({ name: 'login' })
+  }
+})
 
 app.mount('#app')

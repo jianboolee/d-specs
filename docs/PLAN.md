@@ -259,9 +259,10 @@ Flash 容易在「所有分组都加一条」这类指令上逐条枚举、漏�
 ## 4. API 设计
 
 ```
-# 认证
-POST   /api/v1/auth/register | login | refresh
-GET    /api/v1/me
+# 认证（登录由 d-auth 账户中心承担，见 docs/dauth-integration.md）
+GET    /api/v1/auth/config                  SSO 配置（公开）
+GET    /api/v1/auth/session                 登录态探针（公开）
+GET    /api/v1/me                           当前用户
 
 # 参数表
 GET    /api/v1/tables                      列表（分页/搜索）
@@ -367,8 +368,9 @@ event: done         {"usage":{"prompt":1200,"completion":300}}
 > 理由是 `d-ticket/web` 已经用 naive-ui + SCSS，引入第二套样式范式对长期维护不利；
 > 而参数表的列是固定的，也不构成对 headless 表格库的需求。
 >
-> **Redis 已移除**：原规划里 Redis 只用于占位，实际没有任何读写——认证走 JWT
-> 无状态（无服务端会话），对话历史与参数表都落在 PostgreSQL。它唯一的作用是
+> **Redis 已移除**：原规划里 Redis 只用于占位，实际没有任何读写——认证无状态
+> （现为 d-auth 共享 cookie + 本地 JWKS 验签，后端不存会话；见
+> docs/dauth-integration.md），对话历史与参数表都落在 PostgreSQL。它唯一的作用是
 > 启动时 Ping 一次并出现在 `/health/ready` 里，却让生产环境多了一个致命依赖
 > （连不上则应用拒绝启动）。既然没有功能依赖它，就一并去掉了；将来真需要
 > 缓存、限流或 SSE 会话状态时再引回。
@@ -419,6 +421,8 @@ src/
 - 前后端脚手架（后端派生自 `go-template`，前端对齐 `d-ticket/web` 技术栈）
 - 迁移框架 + 首个迁移：`users` / `spec_tables` / `spec_items` / `spec_revisions` / `share_links`
 - 注册登录（JWT）、`user_id` 隔离基线、统一的中文错误文案
+  （后续已迁移：本地账号体系移除，改为 d-auth 账户中心 + 跨子域 SSO，
+  见 docs/dauth-integration.md）
 - 统一响应格式、日志、request id、panic recover
 - AI 层：DeepSeek provider + `ops` 校验协议 + tool 定义 + agent loop
 - **AI 连通性验证工具** `cmd/aicheck` —— 已实测通过，结论见 3.9

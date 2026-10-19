@@ -22,7 +22,7 @@ func Register(rg *gin.RouterGroup, d *deps.Deps, specSvc *spec.Service, analysis
 	h := NewHandler(svc)
 
 	authed := rg.Group("")
-	authed.Use(middleware.AuthRequired(d.JWT))
+	authed.Use(middleware.AuthRequired(d.Verifier, d.Config.DAuth.CookieName))
 
 	// SSE：流式返回整轮对话
 	authed.POST("/tables/:id/chat", h.Stream)

@@ -28,6 +28,11 @@ RUN npm run build
 # ---------- 2. 构建后端 ----------
 FROM golang:1.25-alpine AS api
 
+# d-auth gosdk 只发布在 GitHub，不在公共代理与校验库里；
+# GOPRIVATE 让 go 直接走 git 拉取并跳过 sum.golang.org 校验（go.sum 里已锁定哈希）。
+ENV GOPRIVATE=github.com/jianboolee/d-auth
+RUN apk add --no-cache git
+
 WORKDIR /src
 COPY api/go.mod api/go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \

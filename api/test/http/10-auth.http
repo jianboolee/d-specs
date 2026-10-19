@@ -1,38 +1,37 @@
 # @name auth
-# @description 认证：注册 / 登录 / 当前用户
+# @description 认证：SSO 配置 / 登录态探针 / 当前用户
 #
-# 测试账号由 make http-sync 创建并写入 token。
+# 本地 users 表已移除，本后端不再代理登录——登录在 d-auth 中央登录页完成
+# （浏览器持 `.x-rv.com` 共享 cookie）。后端本地验签该 cookie 或
+# `Authorization: Bearer <d-auth access token>`，两条路径等价。
+#
+# 先执行 make http-sync（直连 d-auth 密码登录取 access token），token 会写入
+# http-client.private.env.json。
 # 语法提示：断言的值不要加引号；`js` 断言只支持 `==`；
 # 且裸真值断言对 undefined 也判为通过，必须写成 `!= undefined`。
 
-### 注册
-# 重复执行会返回 409（邮箱已被注册），属于预期，故不断言状态码
-# @name register
-POST {{baseUrl}}/api/v1/auth/register
-Content-Type: application/json
-
-{
-  "email": "{{email}}",
-  "password": "demo12345",
-  "name": "测试账号"
-}
-
-### 登录
-# @name login
-POST {{baseUrl}}/api/v1/auth/login
-Content-Type: application/json
-
-{
-  "email": "{{email}}",
-  "password": "demo12345"
-}
+### SSO 配置（公开）：前端据此拼登录跳转
+GET {{baseUrl}}/api/v1/auth/config
 
 ?? status == 200
 ?? body code == 0
-?? js response.parsedBody.data.token != undefined
-?? js response.parsedBody.data.expires_at != undefined
+?? js response.parsedBody.data.sso_base_url != undefined
+?? js response.parsedBody.data.client_key != undefined
+
+### 登录态探针：无凭证 —— 未登录返回 {user:null}，不报错
+GET {{baseUrl}}/api/v1/auth/session
+
+?? status == 200
+?? body code == 0
+?? js response.parsedBody.data.user == null
+
+### 登录态探针：带 Bearer —— 已登录返回资料
+GET {{baseUrl}}/api/v1/auth/session
+Authorization: Bearer {{token}}
+
+?? status == 200
+?? body code == 0
 ?? js response.parsedBody.data.user.id != undefined
-?? js response.parsedBody.data.user.email != undefined
 
 ### 当前用户（需登录）
 GET {{baseUrl}}/api/v1/me
@@ -41,7 +40,8 @@ Authorization: Bearer {{token}}
 ?? status == 200
 ?? body code == 0
 ?? js response.parsedBody.data.id != undefined
-?? js response.parsedBody.data.email != undefined
+# 资料不展示 email：响应里不应有该字段
+?? js response.parsedBody.data.email == undefined
 
 ### 未登录访问 /me —— 应 401
 GET {{baseUrl}}/api/v1/me
@@ -57,51 +57,14 @@ Authorization: Bearer not-a-real-token
 ?? status == 401
 ?? body message == 登录已过期，请重新登录
 
-### 密码错误 —— 应 401
-# 邮箱不存在与密码错误返回同一提示，避免账号枚举
-POST {{baseUrl}}/api/v1/auth/login
-Content-Type: application/json
-
-{
-  "email": "{{email}}",
-  "password": "definitely-wrong-password"
-}
-
-?? status == 401
-?? body message == 邮箱或密码不正确
-
-### 密码过短 —— 应 400，且提示为中文
-POST {{baseUrl}}/api/v1/auth/register
-Content-Type: application/json
-
-{
-  "email": "someone-new@dspecs.dev",
-  "password": "123"
-}
-
-?? status == 400
-?? body message == 密码长度不能少于 8
-
-### 邮箱格式非法 —— 应 400，且提示为中文
-POST {{baseUrl}}/api/v1/auth/register
-Content-Type: application/json
-
-{
-  "email": "not-an-email",
-  "password": "demo12345"
-}
-
-?? status == 400
-?? body message == 邮箱格式不正确
-
-### 邮箱大小写不敏感 —— 应 200
-POST {{baseUrl}}/api/v1/auth/login
-Content-Type: application/json
-
-{
-  "email": "DEMO@DSPECS.DEV",
-  "password": "demo12345"
-}
+### 公开接口无需登录（SSO 配置）
+GET {{baseUrl}}/api/v1/auth/config
+# 不带凭证也应放行
 
 ?? status == 200
-?? body code == 0
+
+# 说明：登录/登出/改资料均已从本服务移除——
+#   - 登录：d-auth 中央登录页（GET {sso_base_url}/login?client=…&return_to=…）
+#   - 登出：前端直连 d-auth（POST {dauthBaseUrl}/v1/auth/logout，带 X-DAuth-Client）
+#   - 改昵称：在 d-auth 账户中心完成
+# 需要验证写入类账号操作时，直接在 d-auth 的接口测试里覆盖。

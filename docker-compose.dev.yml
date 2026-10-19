@@ -35,6 +35,8 @@ services:
       - go_build_cache:/root/.cache/go-build
     environment:
       HTTP_PORT: "8401"
+      # d-auth gosdk 只发布在 GitHub，air 首次编译拉模块时走 git 直连（镜像已装 git）
+      GOPRIVATE: github.com/jianboolee/d-auth
       # 覆盖 api/.env 里的路径：容器内前端源码挂在 /web
       WEB_DIST_DIR: /web
       # canonical / OG 用浏览器实际访问的地址（宿主机侧 web 端口，随 WEB_PORT 变化）

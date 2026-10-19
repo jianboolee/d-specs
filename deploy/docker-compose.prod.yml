@@ -1,0 +1,56 @@
+# ============================================================
+# d-specs 生产编排 —— 部署在业务机 47.95.176.70（172.17.255.64）的 /opt/d-specs/
+#
+# 方式：本机 make deploy（构建推 ACR + 这里拉起）或 make deploy-only（用现有镜像）。
+# 环境：同目录 .env.prod（模板见仓库 deploy/env.prod.example；chmod 600，不进 git）。
+# 数据库：使用外部实例，由 .env.prod 的 DATABASE_URL 指定，本文件不起数据库容器。
+#
+# 手动操作（在业务机 /opt/d-specs 下）：
+#   docker compose pull && docker compose up -d    # 更新镜像
+#   docker compose logs -f app                     # 看日志
+#   docker compose ps                              # 看状态（含镜像内置健康检查）
+#
+# 拓扑（与 d-note / d-auth / d-camp 一致）：
+#   入口机 nginx（172.17.255.63）反代 specs.x-rv.com → 内网 172.17.255.64:8400
+#     → 容器 nginx:80（托管 SPA + /api 剥前缀转 Go:8401）。
+#   ⚠️ 绑所有网卡后公网 EIP 上也会监听，需用安全组只放行入口机内网 172.17.255.63。
+# ============================================================
+name: d-specs
+
+services:
+  app:
+    image: ${REGISTRY:-registry.cn-beijing.aliyuncs.com/xrv/d-specs}:${TAG:-latest}
+    platform: linux/amd64
+    container_name: d-specs
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      # 容器内约定值（覆盖 .env.prod 里的同名项；镜像已内置，这里显式再钉一次）
+      APP_ENV: "production"
+      HTTP_PORT: "8401"
+      WEB_DIST_DIR: "/usr/share/nginx/html"
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      # 绑所有网卡；入口机经内网 172.17.255.64:8400 访问。
+      - "${APP_PORT:-8400}:80"
+    healthcheck:
+      # 打后端 /health（而非 nginx），避免把「nginx 活着、后端已挂」误判为健康
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8401/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 3s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# 固定网段：容器网络可预测，便于排查 X-Forwarded-For 链路。
+# 请求链为 入口机nginx → 宿主:8400 → docker → 容器nginx → 127.0.0.1:8401(Go)。
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.248.0/24

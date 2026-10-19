@@ -17,7 +17,7 @@ func Register(rg *gin.RouterGroup, d *deps.Deps) *Service {
 	h := NewHandler(svc)
 
 	authed := rg.Group("")
-	authed.Use(middleware.AuthRequired(d.JWT))
+	authed.Use(middleware.AuthRequired(d.Verifier, d.Config.DAuth.CookieName))
 
 	tables := authed.Group("/tables")
 	tables.GET("", h.List)
