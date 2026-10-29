@@ -1,10 +1,17 @@
 import type { ApiResponse } from '@/types/api'
+import { clearDAuthSession, refreshDAuthSession } from './dauth'
 
 let onUnauthorized: (() => void) | null = null
 
 /** 注册 401 回调，由入口在初始化时注入，避免 http 层依赖路由 */
 export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler
+}
+
+/** 续期也失败后统一清理本地会话标记并通知入口跳登录页。 */
+export function notifyUnauthorized() {
+  clearDAuthSession()
+  onUnauthorized?.()
 }
 
 /** 业务错误：携带后端返回的 code，message 可直接展示给用户 */
@@ -24,6 +31,14 @@ interface RequestOptions {
   method?: string
   body?: unknown
   query?: Record<string, string | number | undefined>
+}
+
+async function fetchOrThrow(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init)
+  } catch {
+    throw new ApiError('网络异常，请检查后端服务是否已启动', -1, 0)
+  }
 }
 
 /**
@@ -51,20 +66,22 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const headers = new Headers()
   if (body !== undefined) headers.set('Content-Type', 'application/json')
 
-  let response: Response
-  try {
-    response = await fetch(url, {
-      method,
-      headers,
-      credentials: 'include',
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
-  } catch {
-    throw new ApiError('网络异常，请检查后端服务是否已启动', -1, 0)
+  const init: RequestInit = {
+    method,
+    headers,
+    credentials: 'include',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  }
+  let response = await fetchOrThrow(url, init)
+
+  // access token 默认 1h 过期。先静默续期再重试一次，避免把「access 到期」
+  // 误判成登录失效；refresh 也失效时才让用户重新登录。
+  if (response.status === 401 && (await refreshDAuthSession())) {
+    response = await fetchOrThrow(url, init)
   }
 
   if (response.status === 401) {
-    onUnauthorized?.()
+    notifyUnauthorized()
     throw new ApiError('登录已过期，请重新登录', 401, 401)
   }
 
@@ -96,15 +113,15 @@ export interface DownloadResult {
  * 依赖浏览器自动携带——导出接口可能跨源，且需要统一处理 401）。
  */
 export async function download(path: string): Promise<DownloadResult> {
-  let response: Response
-  try {
-    response = await fetch(`/api/v1${path}`, { credentials: 'include' })
-  } catch {
-    throw new ApiError('网络异常，请检查后端服务是否已启动', -1, 0)
+  const url = `/api/v1${path}`
+  let response = await fetchOrThrow(url, { credentials: 'include' })
+
+  if (response.status === 401 && (await refreshDAuthSession())) {
+    response = await fetchOrThrow(url, { credentials: 'include' })
   }
 
   if (response.status === 401) {
-    onUnauthorized?.()
+    notifyUnauthorized()
     throw new ApiError('登录已过期，请重新登录', 401, 401)
   }
 

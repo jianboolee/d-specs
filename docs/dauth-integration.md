@@ -11,6 +11,7 @@
 浏览器（d-specs 前端）
    │  未登录：整页跳转 auth.x-rv.com 登录（带回跳）
    │  已登录：自动携带 `.x-rv.com` 共享 cookie（dauth_access = access JWT）
+   │  续期：access 过期时直接调 auth.x-rv.com（同站 XHR，带 dauth_refresh cookie）
    │  登出：直接调 auth.x-rv.com（同站 XHR，带 dauth_refresh cookie）
    ▼
 d-specs Go 后端 ──┬─► 本地验签 dauth_access（RS256 + JWKS，不查库、不请求 d-auth）
@@ -69,9 +70,10 @@ d-auth 限死为 `/v1/auth`，后端收不到、也无法吊销。因此登出�
 两条路径**共用同一套本地验签**。公钥取不到（JWKS 拉不动）统一返回 **503**，
 避免把用户误判成未登录踢下线；token 无效 / 已过期 → **401**。
 
-> access token 默认 1 小时过期。过期后前端会收到 401 → 回 `/login`；此时 d-auth 的
-> 中心会话若仍有效，点一次「登录」即免登回跳（见 d-auth 的 `return-target` 免登场景）。
-> **静默续期（`POST {d-auth}/v1/auth/refresh`）本期未做**，见 §8。
+> access token 默认 1 小时过期。session 探针返回空或业务请求 401 时，前端会用
+> `dauth_refresh` cookie 直接调 `POST {d-auth}/v1/auth/refresh`（`credentials: include`，
+> 带 `X-DAuth-Client` 过 CSRF 门），成功后重试一次。只有 refresh 过期或主动登出才需要
+> 重新登录；并发请求共用一次轮换，避免单次有效的 refresh 被重复消费。
 
 ## 3. 代码落点
 
@@ -83,6 +85,7 @@ d-auth 限死为 `/v1/auth`，后端收不到、也无法吊销。因此登出�
 | `api/internal/infrastructure/dauthclient/profile.go` | 用 API Key 调 `/v1/users/:id` 取展示资料 |
 | `api/internal/modules/auth/handler.go` | config / session / me 处理器 |
 | `web/src/api/auth.ts` | 前端认证客户端（只打 `/api/v1/auth/*`；登出直连 d-auth） |
+| `web/src/api/dauth.ts` | 前端静默续期（直接调 d-auth refresh；并发去重 / 会话提示） |
 | `web/src/stores/auth.ts` | 登录态 store（探针 / SSO 跳转 / 直接调 d-auth 登出） |
 | `web/src/views/LoginView.vue` | 本站极简登录页（点「登录」才跳 d-auth SSO） |
 | `web/src/router/index.ts` | 路由守卫：未登录 → 本站 `/login`（不自动跳 SSO） |
@@ -187,9 +190,9 @@ make nginx        # 下发入口机 vhost 并 reload
   立刻失效——这是 d-auth 读路径纯验签的既定取舍。要更紧就调小 d-auth 的
   `DAUTH_JWT_ACCESS_TTL`。
 - **改资料（昵称/头像）在 d-auth 账户中心完成**，本站无对应接口（原 `PATCH /me` 已移除）。
-- **静默续期未做**：token 过期即 401 → 回 `/login`。要无缝续期需在前端拦截 401 后调
-  `POST {d-auth}/v1/auth/refresh`（`credentials: include`）再重试；依赖 d-auth 的 refresh
-  白名单，可在后续按需补。（d-note 当前也未做。）
+- **静默续期**：`web/src/api/dauth.ts` 在 session 为空（且本地见过登录态）或业务请求 401 时
+  调 d-auth refresh，成功后重试原请求；并发请求共用一次轮换。refresh 过期、登出或吊销后
+  才回 `/login`。
 - token 客户端（小程序）走 `Bearer` 本地验签，与浏览器同一条本地验签路径。
 - 跨子域 cookie 依赖双方同属 `x-rv.com`；若部署到不同站点需改 `SameSite=None + Secure`
   并收紧 CORS（见 `ALLOWED_ORIGINS`）。

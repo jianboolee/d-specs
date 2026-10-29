@@ -1,4 +1,5 @@
-import { ApiError } from './http'
+import { ApiError, notifyUnauthorized } from './http'
+import { refreshDAuthSession } from './dauth'
 
 export interface SSEEvent {
   event: string
@@ -19,20 +20,33 @@ export interface SSEOptions {
  */
 export async function postSSE(url: string, body: unknown, options: SSEOptions): Promise<void> {
   const headers = new Headers({ 'Content-Type': 'application/json' })
+  const init: RequestInit = {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: JSON.stringify(body),
+    signal: options.signal,
+  }
 
   let response: Response
   try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers,
-      credentials: 'include',
-      body: JSON.stringify(body),
-      signal: options.signal,
-    })
+    response = await fetch(url, init)
   } catch (err) {
     if (isAbort(err)) throw err
     throw new ApiError('网络异常，请检查后端服务是否已启动', -1, 0)
   }
+
+  // 流式请求同样可能在 access 到期后收到 401；先续期再重试一次。
+  if (response.status === 401 && (await refreshDAuthSession())) {
+    try {
+      response = await fetch(url, init)
+    } catch (err) {
+      if (isAbort(err)) throw err
+      throw new ApiError('网络异常，请检查后端服务是否已启动', -1, 0)
+    }
+  }
+
+  if (response.status === 401) notifyUnauthorized()
 
   // 后端在建立流之前失败（表不存在、AI 未配置）会返回正常的 JSON 错误
   if (!response.ok) {

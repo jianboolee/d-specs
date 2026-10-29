@@ -2,6 +2,12 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import { authApi, type SSOConfig } from '@/api/auth'
+import {
+  clearDAuthSession,
+  hasDAuthSession,
+  markDAuthSession,
+  refreshDAuthSession,
+} from '@/api/dauth'
 import type { UserProfile } from '@/types/api'
 
 // 登录态的唯一来源是 d-auth 下发的 `.x-rv.com` 共享会话 cookie（前端读不到内容），
@@ -20,8 +26,14 @@ export const useAuthStore = defineStore('auth', () => {
   async function probe() {
     loading.value = true
     try {
-      const res = await authApi.session()
+      let res = await authApi.session()
+      // access token 到期后本站后端只会返回 { user: null }（探针不是 401）。
+      // 只有在本地见过登录态时才尝试续期，避免给匿名访客的公开页增加请求。
+      if (!res.user && hasDAuthSession() && (await refreshDAuthSession())) {
+        res = await authApi.session()
+      }
       user.value = res.user ?? null
+      if (user.value) markDAuthSession()
     } catch {
       user.value = null
     } finally {
@@ -77,6 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       /* 网络失败：仍清本地状态，避免用户卡在「看似已登录」 */
     } finally {
+      clearDAuthSession()
       user.value = null
       window.location.href = '/login'
     }

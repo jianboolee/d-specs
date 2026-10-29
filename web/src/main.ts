@@ -18,7 +18,7 @@ const app = createApp(App)
 app.use(pinia)
 app.use(router)
 
-// 后端 401 = 会话失效（d-auth 登出/吊销/过期）：清空登录态并回到本地登录页。
+// 续期失败后的 401 = 会话失效（refresh 过期/登出/吊销）：清空登录态并回登录页。
 // 路由守卫只在导航时兜底；这里处理「已停在页面上、后台请求突然 401」的情况。
 setUnauthorizedHandler(() => {
   const auth = useAuthStore(pinia)
