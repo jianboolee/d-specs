@@ -9,7 +9,9 @@ import (
 // ==================== 请求 ====================
 
 type CreateRequest struct {
-	Title       string `json:"title" binding:"required,max=120"`
+	// Title 可省略：省略或只含空白时服务端落默认标题（未命名参数表），
+	// 让「新建」可以一键完成，进工作区后再改名。
+	Title       string `json:"title" binding:"max=120"`
 	Description string `json:"description" binding:"max=2000"`
 	Industry    string `json:"industry" binding:"max=64"`
 	// TemplateID 预留：套用模板建表（P3）；上限按 UUID v7 的 36 位字符

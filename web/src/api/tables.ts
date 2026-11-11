@@ -22,7 +22,8 @@ export function listTables(params: ListTablesParams = {}) {
 }
 
 export interface CreateTableInput {
-  title: string
+  /** 省略时服务端用默认标题（未命名参数表） */
+  title?: string
   description?: string
   industry?: string
   template_id?: string

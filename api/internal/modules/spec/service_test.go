@@ -98,6 +98,32 @@ func applyItems(t *testing.T, svc *Service, userID, tableID string, summary stri
 	return res
 }
 
+// ==================== 新建 ====================
+
+// 不传标题（前端「一键新建」）→ 落默认标题，而不是报错。
+func TestCreate_DefaultTitle(t *testing.T) {
+	svc, _, db := newTestService(t)
+	ctx := context.Background()
+	userID := createTestUser(t, db, "默认标题")
+
+	created, err := svc.Create(ctx, userID, CreateRequest{})
+	if err != nil {
+		t.Fatalf("建表失败: %v", err)
+	}
+	if created.Table.Title != DefaultTableTitle {
+		t.Fatalf("标题 = %q，期望 %q", created.Table.Title, DefaultTableTitle)
+	}
+
+	// 只含空白的标题同样落默认值，避免出现一张看不见名字的表
+	created, err = svc.Create(ctx, userID, CreateRequest{Title: "   "})
+	if err != nil {
+		t.Fatalf("建表失败: %v", err)
+	}
+	if created.Table.Title != DefaultTableTitle {
+		t.Fatalf("空白标题 = %q，期望 %q", created.Table.Title, DefaultTableTitle)
+	}
+}
+
 // ==================== 租户隔离 ====================
 
 func TestCrossUserIsolation(t *testing.T) {
@@ -583,11 +609,20 @@ func TestListScopedToUser(t *testing.T) {
 	}
 }
 
-func TestCreateRejectsBlankTitle(t *testing.T) {
+// 新建允许空标题（前端一键新建会省略），但重命名不能把标题改成空白：
+// 否则列表里会出现一张没有名字、无法辨认的表。
+func TestUpdateRejectsBlankTitle(t *testing.T) {
 	svc, _, db := newTestService(t)
+	ctx := context.Background()
 	userID := createTestUser(t, db, "空标题")
 
-	if _, err := svc.Create(context.Background(), userID, CreateRequest{Title: "   "}); !errors.Is(err, ErrTitleRequired) {
+	created, err := svc.Create(ctx, userID, CreateRequest{})
+	if err != nil {
+		t.Fatalf("建表失败: %v", err)
+	}
+
+	blank := "   "
+	if _, err := svc.UpdateMeta(ctx, userID, created.Table.ID, UpdateRequest{Title: &blank}); !errors.Is(err, ErrTitleRequired) {
 		t.Errorf("期望 ErrTitleRequired，实际 %v", err)
 	}
 }

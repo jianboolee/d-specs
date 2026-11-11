@@ -62,7 +62,7 @@ export const useSpecTableStore = defineStore('specTable', () => {
     }
   }
 
-  async function createTable(input: { title: string; description?: string; industry?: string }) {
+  async function createTable(input: { title?: string; description?: string; industry?: string }) {
     const res = await api.createTable(input)
     await loadTables()
     return res

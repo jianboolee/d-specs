@@ -27,7 +27,7 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const spec = useSpecTableStore()
-const { open: openCreate } = useCreateTable()
+const { creating, create } = useCreateTable()
 const { mode: themeMode, toggle: toggleTheme } = useThemeMode()
 const { collapsed: sidebarCollapsed, toggle: toggleSidebar } = useSidebar()
 
@@ -95,10 +95,10 @@ function openTable(id: string) {
   void router.push({ name: 'workspace', params: { id } })
 }
 
-// 直接唤起全局新建弹窗，停在当前页，不再跳到列表页
+// 一键建表并直接进入新表的工作区（移动端先收起抽屉，避免遮住跳转后的页面）
 function goCreate() {
   closeSidebar()
-  openCreate()
+  void create()
 }
 
 // 「全部」直接打开参数表列表页
@@ -163,8 +163,14 @@ onMounted(() => {
       </Tooltip>
     </div>
 
-    <button class="new-btn" type="button" :title="isCollapsed ? '新建参数表' : undefined" @click="goCreate">
-      <i class="ri-add-line" />
+    <button
+      class="new-btn"
+      type="button"
+      :title="isCollapsed ? '新建参数表' : undefined"
+      :disabled="creating"
+      @click="goCreate"
+    >
+      <i :class="creating ? 'ri-loader-4-line animate-spin' : 'ri-add-line'" />
       <span v-if="!isCollapsed">新建参数表</span>
     </button>
 
@@ -363,6 +369,17 @@ onMounted(() => {
   background: var(--ds-surface-muted);
   color: var(--ds-text);
   box-shadow: var(--ds-shadow-md);
+}
+
+/* 建表请求进行中：只保留转圈，避免连点建出多张表 */
+.new-btn:disabled {
+  cursor: progress;
+  opacity: 0.75;
+}
+
+.new-btn:disabled:hover {
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-sm);
 }
 
 .sidebar.collapsed .new-btn {

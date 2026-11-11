@@ -18,7 +18,7 @@ import { useCreateTable } from '@/composables/useCreateTable'
 const router = useRouter()
 const auth = useAuthStore()
 const spec = useSpecTableStore()
-const { open: openCreate } = useCreateTable()
+const { creating, create } = useCreateTable()
 
 const displayName = computed(() => auth.user?.name || auth.user?.phone || '')
 
@@ -57,7 +57,7 @@ onMounted(() => {
             <span v-if="tableCount > 0" class="count">{{ tableCount }}</span>
           </Button>
 
-          <Button size="lg" variant="outline" @click="openCreate">
+          <Button size="lg" variant="outline" :disabled="creating" @click="create">
             <i class="ri-add-line" />
             新建参数表
           </Button>

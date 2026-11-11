@@ -37,10 +37,14 @@ func (s *Service) List(ctx context.Context, userID, keyword string, page, size i
 	return &ListResult{Items: items, Total: total, Page: page, Size: size}, nil
 }
 
+// DefaultTableTitle 是新建时未提供标题的兜底名。
+// 「新建」不再要求先填标题，用户可以一键建表、进工作区后再改名。
+const DefaultTableTitle = "未命名参数表"
+
 func (s *Service) Create(ctx context.Context, userID string, req CreateRequest) (*DetailResult, error) {
 	title := strings.TrimSpace(req.Title)
 	if title == "" {
-		return nil, ErrTitleRequired
+		title = DefaultTableTitle
 	}
 
 	table, err := s.repo.CreateTable(ctx, userID, title, req.Description, req.Industry, nil)

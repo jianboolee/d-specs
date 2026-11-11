@@ -21,8 +21,8 @@ onMounted(() => {
 
 // ---------- 新建 ----------
 
-// 弹窗由 App 全局挂载一份，这里只负责唤起，避免各自维护
-const { open: openCreate } = useCreateTable()
+// 一键创建：直接建一张默认名的表并进入工作区，不再弹窗要求先填标题
+const { creating, create } = useCreateTable()
 
 // ---------- 行操作 ----------
 
@@ -55,7 +55,7 @@ function describe(err: unknown) {
           <h2>我的参数表</h2>
           <span v-if="spec.tables.length > 0" class="title-count">{{ spec.tables.length }}</span>
         </div>
-        <Button size="sm" @click="openCreate">
+        <Button size="sm" :disabled="creating" @click="create">
           <i class="ri-add-line" />
           新建参数表
         </Button>
@@ -69,7 +69,7 @@ function describe(err: unknown) {
           </div>
           <h3>还没有参数表</h3>
           <p>每张参数表对应一个产品。<br />建好之后可以直接让 AI 帮你填充参数。</p>
-          <Button @click="openCreate">
+          <Button :disabled="creating" @click="create">
             <i class="ri-add-line" />
             新建第一张参数表
           </Button>
