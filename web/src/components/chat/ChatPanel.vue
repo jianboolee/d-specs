@@ -43,12 +43,14 @@ const draft = ref('')
 const listRef = ref<HTMLElement | null>(null)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
-/** 空态下的快捷建议，点击后填入输入框 */
+/**
+ * 空态引导只保留三条：新建 / 改值 / 整理，覆盖最高频的三类操作。
+ * 再多就会变成「说明书」，用户反而不知道该点哪个。
+ */
 const suggestions = [
-  '帮我建一张房车的参数表',
-  '把续航里程改成 800km',
-  '给动力分组下的参数都加上单位',
-  '把这张表按分组重新整理一遍',
+  { icon: 'ri-add-line', label: '新建一张房车的参数表', prompt: '帮我建一张房车的参数表' },
+  { icon: 'ri-edit-line', label: '把续航里程改成 800km', prompt: '把续航里程改成 800km' },
+  { icon: 'ri-list-check-2', label: '按分组重新整理这张表', prompt: '把这张表按分组重新整理一遍' },
 ]
 
 /**
@@ -251,20 +253,22 @@ function kindLabel(kind: ChatChange['kind']) {
         <span>正在加载历史对话…</span>
       </div>
 
-      <!-- 空态作为插槽放在滚动区内，避免用绝对定位叠在列表上 -->
+      <!-- 空态放在滚动区内，避免用绝对定位叠在列表上：一句引导 + 三条示例，点击填入输入框 -->
       <div v-else-if="messages.length === 0 && !sending" class="chat-empty">
-        <slot name="empty" />
-        <div class="suggestions">
-          <button
-            v-for="s in suggestions"
-            :key="s"
-            type="button"
-            class="suggestion"
-            @click="pickSuggestion(s)"
-          >
-            {{ s }}
-          </button>
+        <div class="empty-intro">
+          <h3>我可以帮你完成一张产品参数配置表</h3>
+          <p>告诉我产品名称或要改的地方，我来整理成参数表。</p>
         </div>
+
+        <ul class="empty-hints">
+          <li v-for="hint in suggestions" :key="hint.prompt">
+            <button type="button" class="empty-hint" @click="pickSuggestion(hint.prompt)">
+              <i :class="hint.icon" />
+              <span>{{ hint.label }}</span>
+              <i class="ri-arrow-right-line hint-arrow" />
+            </button>
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -357,48 +361,108 @@ function kindLabel(kind: ChatChange['kind']) {
   color: var(--ds-text-tertiary);
 }
 
-/* 空态：在滚动区里垂直居中，内容超高时随列表一起滚动 */
+/*
+ * 空态：在滚动区里垂直居中，内容超高时随列表一起滚动。
+ * 排版按「一句标题 → 一行解释 → 三条可点示例」递减，视线只落在中间一列，
+ * 不再用长段落 + 胶囊堆叠，避免一进来就被文字量压住。
+ */
 .chat-empty {
   min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 24px 8px 40px;
+  padding: 24px 8px 48px;
 }
 
-.chat-empty :deep(p) {
-  margin: 0;
-  max-width: 360px;
-  font-size: var(--ds-font-base);
-  line-height: 1.9;
-  color: var(--ds-text-tertiary);
-  white-space: pre-wrap;
+.empty-intro {
+  max-width: 320px;
   text-align: center;
 }
 
-.suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  max-width: 340px;
-}
-
-.suggestion {
-  padding: 6px 12px;
-  border-radius: 16px;
-  background: var(--ds-surface-muted);
-  color: var(--ds-text-secondary);
-  font-size: var(--ds-font-xs);
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.suggestion:hover {
-  background: var(--ds-border);
+.empty-intro h3 {
+  margin: 0;
+  font-size: var(--ds-font-md);
+  font-weight: 600;
+  letter-spacing: -0.01em;
   color: var(--ds-text);
+}
+
+.empty-intro p {
+  margin: 6px 0 0;
+  font-size: var(--ds-font-xs);
+  line-height: 1.7;
+  color: var(--ds-text-tertiary);
+}
+
+.empty-hints {
+  width: 100%;
+  max-width: 300px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.empty-hint {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ds-border);
+  border-radius: 10px;
+  background: var(--ds-surface);
+  color: var(--ds-text-secondary);
+  font-size: var(--ds-font-sm);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.empty-hint > i:first-child {
+  flex: none;
+  font-size: 15px;
+  color: var(--ds-text-tertiary);
+  transition: color 0.16s ease;
+}
+
+.empty-hint span {
+  flex: 1;
+  min-width: 0;
+}
+
+.hint-arrow {
+  flex: none;
+  font-size: 14px;
+  color: var(--ds-text-tertiary);
+  opacity: 0;
+  transform: translateX(-3px);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.empty-hint:hover {
+  border-color: var(--ds-primary);
+  background: var(--ds-surface-muted);
+  color: var(--ds-text);
+}
+
+.empty-hint:hover > i:first-child,
+.empty-hint:hover .hint-arrow {
+  color: var(--ds-primary);
+}
+
+.empty-hint:hover .hint-arrow {
+  opacity: 1;
+  transform: none;
 }
 
 .msg {

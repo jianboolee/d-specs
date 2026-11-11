@@ -130,15 +130,6 @@ async function handleUpdateMeta(patch: { title?: string; description?: string })
   }
 }
 
-const chatPlaceholder = computed(
-  () =>
-    '直接告诉我要怎么调整这张表，例如：\n\n' +
-    '· 帮我建一张房车的参数表\n' +
-    '· 把续航里程改成 800km\n' +
-    '· 动力分组下的参数都加上单位\n\n' +
-    '改动会自动应用，随时可以撤销。',
-)
-
 async function load() {
   if (!tableId.value) return
   try {
@@ -380,11 +371,7 @@ async function handleUndoMessage(messageId: string) {
             @analyze="handleAnalyzeTurn"
             @stop="chat.abort"
             @undo="handleUndoMessage"
-          >
-            <template #empty>
-              <p>{{ chatPlaceholder }}</p>
-            </template>
-          </ChatPanel>
+          />
         </div>
 
         <SpecCanvas
@@ -667,7 +654,7 @@ async function handleUndoMessage(messageId: string) {
   margin-top: 12px;
 }
 
-/* 空态引导由 ChatPanel 的 empty 插槽渲染在滚动区内 */
+/* 空态引导由 ChatPanel 自己渲染；这里只保证对话区撑满剩余高度 */
 .chat-col > :deep(.chat) {
   flex: 1;
   min-height: 0;
