@@ -169,14 +169,38 @@ make nginx        # 下发入口机 vhost 并 reload
 `HTTP_PORT=8401`、`WEB_DIST_DIR=/usr/share/nginx/html`、`SITE_URL=https://specs.x-rv.com`、
 `ALLOWED_ORIGINS` 留空（同源）。
 
-## 7. 本地开发（注意 SSO 无法直接复现）
+## 7. 本地开发
 
-本地 d-auth 的 `DAUTH_COOKIE_DOMAIN` 为空（host-only），`localhost` 之间无法共享 cookie，
-所以 SSO 主链路在纯 `localhost` 下跑不通。可选方案：
+本地 d-auth 的 `DAUTH_COOKIE_DOMAIN` 为空（host-only）。cookie 不区分端口，所以
+`localhost:8681` 下发的 access cookie 会被浏览器同样带到 `localhost:8402`，
+**纯 `localhost` 就能跑通 SSO**，不需要 hosts / 本地子域。
 
-- **推荐**：用本地子域 + hosts，例如 `specs.local.test` / `auth.local.test` 都指向
-  127.0.0.1，本地 d-auth 配 `DAUTH_COOKIE_DOMAIN=.local.test`，即可复现跨子域 cookie。
-- 或临时保留一条 dev 专用登录路径（当前未实现，需要时再加）。
+前提是两边三个值必须对齐，否则会出现「点登录 → 回到本站仍判未登录 → 又跳登录」的死循环：
+
+| 配置 | 本地值 | 说明 |
+| --- | --- | --- |
+| d-auth `DAUTH_COOKIE_NAME` | `dauth_access` | 本机不要带 `__Secure-` 前缀（http 下浏览器会拒收），也别用旧的 `dauth_session` |
+| d-auth `DAUTH_COOKIE_SECURE` | `false` | 同上；生产才是 `true` |
+| d-auth `DAUTH_PUBLIC_URL` | `http://localhost:8681` | access JWT 的 `iss` 取这个值 |
+| d-specs `DAUTH_BASE_URL` | `http://localhost:8681` | 后端拉 JWKS / 取资料直连 API |
+| d-specs `DAUTH_SSO_BASE_URL` | `http://localhost:8682` | 浏览器跳转的登录页（d-auth web，`:8682` 代理 `/v1` 到 `:8681`） |
+| d-specs `DAUTH_COOKIE_NAME` | `dauth_access` | 必须与 d-auth 一致 |
+| d-specs `DAUTH_JWT_ISSUER` | `http://localhost:8681` | 必须等于 d-auth `DAUTH_PUBLIC_URL`；留空会回落到 `DAUTH_BASE_URL`，此处两者同值 |
+
+注意 `DAUTH_BASE_URL` 取 `:8681` 而 `DAUTH_SSO_BASE_URL` 取 `:8682`：前者是后端到后端的
+调用，后者是浏览器要访问的页面地址，混用会让 `iss` 校验失败（表现为 cookie 有了但依然
+探针返回 `{user:null}`）。
+
+排查用两条命令即可定位：
+
+```bash
+# 1) d-specs 看到的是不是同一枚 cookie 名
+curl -s http://localhost:8401/api/v1/auth/config
+# 2) 带上浏览器里的 cookie 直接问后端：仍然 user:null 就是 cookie 名/issuer 不匹配
+curl -s -H 'Cookie: dauth_access=<从浏览器 DevTools 复制的值>' \
+  http://localhost:8401/api/v1/auth/session
+```
+
 - **接口测试**（`api/test/`）不受影响：`sync-env.sh` 直连 d-auth 密码登录取 access
   token，用 `Authorization: Bearer` 本地验签，绕开 cookie。
 
