@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import * as shareApi from '@/api/share'
 import { ApiError } from '@/api/http'
+import ShareQrDialog from '@/components/share/ShareQrDialog.vue'
 import type { PublicSpec } from '@/types/api'
 
 /**
@@ -51,6 +52,17 @@ const exportUrl = computed(() => `/api/v1/public/specs/${tableId.value}/export`)
 
 function printPage() {
   window.print()
+}
+
+// ---------- 二维码 ----------
+
+const qrOpen = ref(false)
+/** 打开弹窗时才取地址：SSR 阶段没有 window，且要拿到访客实际的完整 URL */
+const qrUrl = ref('')
+
+function openQr() {
+  qrUrl.value = window.location.href
+  qrOpen.value = true
 }
 
 onMounted(async () => {
@@ -119,6 +131,10 @@ function readSeed(): PublicSpec | null {
               <i class="ri-file-pdf-2-line" />
               PDF
             </button>
+            <button type="button" class="toolbar-btn" @click="openQr">
+              <i class="ri-qr-code-line" />
+              二维码
+            </button>
           </div>
         </div>
 
@@ -137,6 +153,8 @@ function readSeed(): PublicSpec | null {
         </section>
       </template>
     </main>
+
+    <ShareQrDialog v-model:open="qrOpen" :url="qrUrl" :table-title="spec?.title" />
 
     <footer class="share-foot">由小野驴科技提供技术支持</footer>
   </div>
