@@ -18,6 +18,8 @@ const webPort = Number(process.env.WEB_PORT || 8402)
 export default defineConfig({
   base: '/',
   server: {
+    // 允许本地开发域名（dev-proxy 转发时 Host 是 specs.dev.test）
+    allowedHosts: ['.dev.test'],
     host: '0.0.0.0',
     port: webPort,
     // 端口被占用时直接报错，而不是静默换到下一个端口：
